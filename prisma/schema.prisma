@@ -1,13 +1,129 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+model Location {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  address     String
+  phone       String
+  email       String?
+  openTime    String
+  closeTime   String
+  capacity    Int
+  mapEmbedUrl String?
+  createdAt   DateTime @default(now())
+
+  menuItems    MenuItem[]
+  pickupSlots  PickupSlot[]
+  reservations Reservation[]
+  orders       Order[]
+}
+
+model MenuCategory {
+  id        String @id @default(uuid())
+  name      String
+  slug      String @unique
+  sortOrder Int    @default(0)
+
+  items MenuItem[]
+}
+
+model MenuItem {
+  id          String  @id @default(uuid())
+  name        String
+  description String?
+  price       Int // cents (EUR)
+  imageUrl    String?
+  isAvailable Boolean @default(true)
+  sortOrder   Int     @default(0)
+
+  categoryId String
+  locationId String
+  category   MenuCategory @relation(fields: [categoryId], references: [id])
+  location   Location     @relation(fields: [locationId], references: [id])
+
+  orderItems OrderItem[]
+}
+
+model PickupSlot {
+  id       String   @id @default(uuid())
+  date     DateTime @db.Date
+  time     String
+  capacity Int
+  booked   Int      @default(0)
+
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id])
+
+  orders Order[]
+
+  @@unique([locationId, date, time])
+}
+
+model Order {
+  id              String      @id @default(uuid())
+  status          OrderStatus @default(PENDING)
+  totalAmount     Int // cents
+  customerName    String
+  customerPhone   String
+  customerEmail   String?
+  notes           String?
+  molliePaymentId String?
+  paidAt          DateTime?
+  createdAt       DateTime    @default(now())
+
+  locationId   String
+  pickupSlotId String
+  location     Location   @relation(fields: [locationId], references: [id])
+  pickupSlot   PickupSlot @relation(fields: [pickupSlotId], references: [id])
+  items        OrderItem[]
+}
+
+model OrderItem {
+  id       String @id @default(uuid())
+  quantity Int
+  price    Int // snapshot at time of order (cents)
+
+  orderId    String
+  menuItemId String
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id])
+}
+
+model Reservation {
+  id            String            @id @default(uuid())
+  date          DateTime          @db.Date
+  time          String
+  partySize     Int
+  customerName  String
+  customerPhone String
+  customerEmail String?
+  notes         String?
+  status        ReservationStatus @default(CONFIRMED)
+  createdAt     DateTime          @default(now())
+
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id])
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  PREPARING
+  READY
+  COMPLETED
+  CANCELLED
+}
+
+enum ReservationStatus {
+  CONFIRMED
+  SEATED
+  CANCELLED
+  NO_SHOW
 }
