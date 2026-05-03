@@ -1,5 +1,6 @@
 
 import { prisma } from "@/lib/prisma";
+import { requireAdminAuth } from "@/lib/require-admin";
 
 interface ReservationWithLocation {
   id: string;
@@ -13,6 +14,7 @@ interface ReservationWithLocation {
 }
 
 export default async function AdminReservationsPage() {
+  await requireAdminAuth();
   const reservations: ReservationWithLocation[] = await prisma.reservation.findMany({
     orderBy: [{ date: "asc" }, { time: "asc" }],
     include: { location: true },

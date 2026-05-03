@@ -1,5 +1,6 @@
 
 import { prisma } from "@/lib/prisma";
+import { requireAdminAuth } from "@/lib/require-admin";
 
 interface OrderWithItems {
   id: string;
@@ -14,6 +15,7 @@ interface OrderWithItems {
 }
 
 export default async function AdminOrdersPage() {
+  await requireAdminAuth();
   const orders: OrderWithItems[] = await prisma.order.findMany({
     orderBy: { createdAt: "desc" },
     include: {

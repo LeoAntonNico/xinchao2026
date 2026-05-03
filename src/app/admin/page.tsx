@@ -1,9 +1,12 @@
 
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { Package, CalendarCheck, Utensils, Store } from "lucide-react";
+import { Package, CalendarCheck } from "lucide-react";
+import { requireAdminAuth } from "@/lib/require-admin";
 
 export default async function AdminPage() {
+  await requireAdminAuth();
+
   const orderCount = await prisma.order.count();
   const reservationCount = await prisma.reservation.count();
   const menuItemCount = await prisma.menuItem.count();
