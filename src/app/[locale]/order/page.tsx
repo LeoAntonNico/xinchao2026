@@ -1,177 +1,217 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useCart } from "@/context/CartContext";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
+import { useCart } from "@/components/CartContext";
+import { MapPin, Clock, ShoppingBag } from "lucide-react";
 
-interface LocationOption {
+interface Location {
   id: string;
   name: string;
   slug: string;
+  address: string;
+  openTime: string;
+  closeTime: string;
+}
+
+interface PickupSlot {
+  id: string;
+  date: string;
+  time: string;
+  capacity: number;
+  booked: number;
+}
+
+interface MenuCategory {
+  id: string;
+  name: string;
+  slug: string;
+  items: MenuItem[];
+}
+
+interface MenuItem {
+  id: string;
+  name: string;
+  description: string | null;
+  price: number;
 }
 
 export default function OrderPage() {
-  const { items, total, clearCart } = useCart();
-  const router = useRouter();
-  const [locations, setLocations] = useState<LocationOption[]>([]);
-  const [slots, setSlots] = useState<{ id: string; time: string; date: string }[]>([]);
-  const [form, setForm] = useState({
-    name: "",
-    phone: "",
-    email: "",
-    notes: "",
-    location: "",
-    slot: "",
-  });
-  const [loading, setLoading] = useState(false);
+  const t = useTranslations();
+  const locale = useLocale();
+  const { addItem, setIsOpen } = useCart();
 
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [selectedLocation, setSelectedLocation] = useState<string>("");
+  const [slots, setSlots] = useState<PickupSlot[]>([]);
+  const [selectedSlot, setSelectedSlot] = useState<string>("");
+  const [categories, setCategories] = useState<MenuCategory[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [step, setStep] = useState<"location" | "menu">("location");
+
+  // Load locations on mount
   useEffect(() => {
     fetch("/api/locations")
       .then((r) => r.json())
-      .then((d) => setLocations(d));
+      .then(setLocations)
+      .finally(() => setLoading(false));
   }, []);
 
+  // Load slots when location selected
   useEffect(() => {
-    if (form.location) {
-      fetch(`/api/slots?locationId=${form.location}&days=3`)
-        .then((r) => r.json())
-        .then((d) => setSlots(d.slice(0, 10)));
-    }
-  }, [form.location]);
+    if (!selectedLocation) return;
+    fetch(`/api/slots?locationId=${selectedLocation}&days=7`)
+      .then((r) => r.json())
+      .then((data) => {
+        setSlots(data);
+        setSelectedSlot("");
+      });
+  }, [selectedLocation]);
 
-  const formatPrice = (cents: number) =>
-    `\u20ac${(cents / 100).toFixed(2).replace(".", ",")}`;
+  // Load menu when location selected
+  useEffect(() => {
+    if (!selectedLocation) return;
+    fetch(`/api/menu?locationId=${selectedLocation}`)
+      .then((r) => r.json())
+      .then(setCategories);
+  }, [selectedLocation]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!items.length || !form.location || !form.slot) return;
-    setLoading(true);
-    const res = await fetch("/api/order", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, items }),
+  const formatDate = (dateStr: string) => {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString(locale === "nl" ? "nl-NL" : "en-US", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
     });
-    const data = await res.json();
-    setLoading(false);
-    if (data.paymentUrl) {
-      window.location.href = data.paymentUrl;
-    } else {
-      alert(data.error || "Something went wrong");
-    }
   };
 
-  if (!items.length) {
+  const formatPrice = (cents: number) =>
+    `€${(cents / 100).toFixed(2).replace(".", ",")}`;
+
+  if (loading) return <div className="text-gray-400">{t("common.loading")}</div>;
+
+  if (step === "location") {
     return (
-      <div className="p-8">
-        <h1 className="text-2xl font-bold text-white mb-4">Your Order</h1>
-        <p className="text-gray-400">Your cart is empty. Head to the menu to add items!</p>
+      <div className="space-y-8 max-w-2xl">
+        <h1 className="text-3xl font-bold text-white">{t("order.selectLocation")}</h1>
+        <div className="grid gap-4">
+          {locations.map((loc) => (
+            <button
+              key={loc.id}
+              onClick={() => {
+                setSelectedLocation(loc.id);
+              }}
+              className={`text-left p-6 rounded-xl border transition-colors ${
+                selectedLocation === loc.id
+                  ? "border-brand-gold bg-sidebar"
+                  : "border-border-default hover:border-gray-500"
+              }`}
+            >
+              <div className="flex items-start gap-4">
+                <MapPin className="w-5 h-5 text-brand-red mt-1 shrink-0" />
+                <div>
+                  <h3 className="font-bold text-white">{loc.name}</h3>
+                  <p className="text-gray-400 text-sm">{loc.address}</p>
+                  <p className="text-gray-500 text-sm mt-1">
+                    {loc.openTime} – {loc.closeTime}
+                  </p>
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+
+        {selectedLocation && (
+          <div className="space-y-4">
+            <h2 className="text-xl font-semibold text-white">{t("order.selectPickupTime")}</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              {slots.map((slot) => (
+                <button
+                  key={slot.id}
+                  onClick={() => setSelectedSlot(slot.id)}
+                  className={`p-3 rounded-lg border text-center text-sm transition-colors ${
+                    selectedSlot === slot.id
+                      ? "border-brand-gold bg-brand-gold/10 text-brand-gold"
+                      : "border-border-default text-gray-300 hover:border-gray-500"
+                  }`}
+                >
+                  <div className="font-medium">{formatDate(slot.date)}</div>
+                  <div className="text-gray-400">{slot.time}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {selectedLocation && selectedSlot && (
+          <button
+            onClick={() => setStep("menu")}
+            className="w-full py-3 bg-brand-red text-white rounded-lg font-medium hover:bg-[#a01830] transition-colors"
+          >
+            {t("menu.categories")} →
+          </button>
+        )}
       </div>
     );
   }
 
+  // Menu step
   return (
-    <div className="p-8 max-w-2xl">
-      <h1 className="text-2xl font-bold text-white mb-6">Checkout</h1>
-
-      <div className="mb-6 rounded-xl border border-white/5 bg-sidebar p-4">
-        <h3 className="text-sm font-semibold text-white mb-3">Order Summary</h3>
-        <ul className="space-y-2">
-          {items.map((item) => (
-            <li key={item.menuItemId} className="flex justify-between text-sm">
-              <span className="text-gray-300">{item.name} x{item.quantity}</span>
-              <span className="text-white font-medium">{formatPrice(item.price * item.quantity)}</span>
-            </li>
-          ))}
-        </ul>
-        <div className="mt-3 border-t border-white/5 pt-3 flex justify-between font-semibold text-white">
-          <span>Total</span>
-          <span>{formatPrice(total)}</span>
-        </div>
+    <div className="space-y-8">
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold text-white">{t("nav.menu")}</h1>
+        <button
+          onClick={() => setStep("location")}
+          className="text-sm text-gray-400 hover:text-white underline"
+        >
+          ← {t("order.selectLocation")}
+        </button>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Location</label>
-          <select
-            value={form.location}
-            onChange={(e) => setForm({ ...form, location: e.target.value, slot: "" })}
-            className="w-full rounded-lg bg-sidebar border border-white/10 px-4 py-2.5 text-white text-sm focus:border-brand-gold focus:outline-none"
-            required
-          >
-            <option value="">Select a location</option>
-            {locations.map((loc) => (
-              <option key={loc.id} value={loc.id}>{loc.name}</option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Pickup Time</label>
-          <select
-            value={form.slot}
-            onChange={(e) => setForm({ ...form, slot: e.target.value })}
-            className="w-full rounded-lg bg-sidebar border border-white/10 px-4 py-2.5 text-white text-sm focus:border-brand-gold focus:outline-none"
-            required
-            disabled={!form.location}
-          >
-            <option value="">Select a time</option>
-            {slots.map((s) => (
-              <option key={s.id} value={s.id}>{s.date} {s.time}</option>
-            ))}
-          </select>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Your Name</label>
-            <input
-              type="text"
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              className="w-full rounded-lg bg-sidebar border border-white/10 px-4 py-2.5 text-white text-sm focus:border-brand-gold focus:outline-none"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Phone</label>
-            <input
-              type="tel"
-              value={form.phone}
-              onChange={(e) => setForm({ ...form, phone: e.target.value })}
-              className="w-full rounded-lg bg-sidebar border border-white/10 px-4 py-2.5 text-white text-sm focus:border-brand-gold focus:outline-none"
-              required
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Email (optional)</label>
-          <input
-            type="email"
-            value={form.email}
-            onChange={(e) => setForm({ ...form, email: e.target.value })}
-            className="w-full rounded-lg bg-sidebar border border-white/10 px-4 py-2.5 text-white text-sm focus:border-brand-gold focus:outline-none"
-          />
-        </div>
-
-        <div>
-          <label className="block text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Notes</label>
-          <textarea
-            value={form.notes}
-            onChange={(e) => setForm({ ...form, notes: e.target.value })}
-            className="w-full rounded-lg bg-sidebar border border-white/10 px-4 py-2.5 text-white text-sm focus:border-brand-gold focus:outline-none"
-            rows={3}
-          />
-        </div>
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full rounded-lg bg-brand-red py-3 text-sm font-semibold text-white hover:bg-red-700 transition-colors disabled:opacity-50"
-        >
-          {loading ? "Processing..." : "Pay with Mollie"}
-        </button>
-      </form>
+      <div className="space-y-10">
+        {categories.map((cat) => (
+          <section key={cat.id}>
+            <h2 className="text-xl font-semibold text-brand-gold mb-4 flex items-center gap-2">
+              {cat.name}
+              <span className="h-px flex-1 bg-white/5" />
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {cat.items.map((item) => (
+                <div
+                  key={item.id}
+                  className="group flex items-start justify-between rounded-xl border border-white/5 bg-sidebar p-4 hover:border-brand-gold/30 transition-all"
+                >
+                  <div className="flex-1">
+                    <h3 className="font-medium text-white group-hover:text-brand-gold transition-colors">
+                      {item.name}
+                    </h3>
+                    {item.description && (
+                      <p className="text-sm text-gray-400 mt-1">{item.description}</p>
+                    )}
+                    <span className="text-sm font-semibold text-white mt-2 inline-block">
+                      {formatPrice(item.price)}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      addItem({
+                        menuItemId: item.id,
+                        name: item.name,
+                        price: item.price,
+                      });
+                      setIsOpen(true);
+                    }}
+                    className="ml-3 px-3 py-2 bg-gray-700 text-white rounded-lg text-sm hover:bg-brand-red transition-colors flex items-center gap-1"
+                  >
+                    <ShoppingBag className="w-4 h-4" />
+                    {t("menu.addToCart")}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
     </div>
   );
 }
