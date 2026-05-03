@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createPayment } from "@/lib/mollie";
+import { sendOrderPendingEmail } from "@/lib/notifications";
 import { Prisma } from "@prisma/client";
 
 interface OrderItemInput {
@@ -59,6 +60,31 @@ export async function POST(req: Request) {
       where: { id: order.id },
       data: { molliePaymentId: payment.id },
     });
+
+    // Fetch related info for email
+    const [location, slot] = await Promise.all([
+      prisma.location.findUnique({ where: { id: locationId }, select: { name: true } }),
+      prisma.pickupSlot.findUnique({ where: { id: slotId }, select: { date: true, time: true } }),
+    ]);
+    const itemNames = await prisma.menuItem.findMany({
+      where: { id: { in: items.map((i: OrderItemInput) => i.menuItemId) } },
+      select: { id: true, name: true },
+    });
+    const nameMap = Object.fromEntries(itemNames.map((m) => [m.id, m.name]));
+
+    if (email && slot && location) {
+      await sendOrderPendingEmail({
+        to: email,
+        orderId: order.id,
+        customerName: name,
+        total: total / 100,
+        items: items.map((i: OrderItemInput) => ({ name: nameMap[i.menuItemId] ?? "Item", qty: i.quantity })),
+        location: location.name,
+        pickupDate: new Date(slot.date).toLocaleDateString("en-GB"),
+        pickupTime: slot.time,
+        paymentUrl: payment.getCheckoutUrl()!,
+      }).catch(console.error);
+    }
 
     return NextResponse.json({ paymentUrl: payment.getCheckoutUrl() });
   } catch (e: unknown) {

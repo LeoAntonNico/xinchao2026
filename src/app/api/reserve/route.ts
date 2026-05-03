@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import { sendReservationEmail } from "@/lib/notifications";
 
 export async function POST(req: Request) {
   try {
@@ -22,7 +23,7 @@ export async function POST(req: Request) {
 
     const location = await prisma.location.findUnique({
       where: { id: locationId },
-      select: { capacity: true },
+      select: { capacity: true, name: true, phone: true },
     });
 
     if (!location) {
@@ -49,6 +50,18 @@ export async function POST(req: Request) {
         locationId,
       },
     });
+
+    if (email) {
+      await sendReservationEmail({
+        to: email,
+        customerName: name,
+        partySize: party,
+        date: new Date(date).toLocaleDateString("en-GB"),
+        time,
+        location: location?.name ?? "",
+        restaurantPhone: location?.phone ?? "",
+      }).catch(console.error);
+    }
 
     return NextResponse.json({ id: reservation.id });
   } catch (e: unknown) {
