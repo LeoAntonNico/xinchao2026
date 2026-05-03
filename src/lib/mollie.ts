@@ -1,34 +1,38 @@
-import createMollieClient, { MollieClient } from "@mollie/api-client";
+import createMollieClient, { PaymentCreateParams } from "@mollie/api-client";
 
-function getMollieClient(): MollieClient {
-  const apiKey = process.env.MOLLIE_API_KEY;
-  if (!apiKey) {
-    throw new Error("MOLLIE_API_KEY is not set");
-  }
-  return createMollieClient({ apiKey });
+const mollieApiKey = process.env["MOLLIE_API_KEY"];
+
+if (!mollieApiKey) {
+  throw new Error("MOLLIE_API_KEY is not set in environment");
 }
 
-export async function createPayment(
-  amount: number,
-  orderId: string,
-  redirectUrl: string
-) {
-  const mollie = getMollieClient();
-  return mollie.payments.create({
+export const mollieClient = createMollieClient({ apiKey: mollieApiKey });
+
+interface CreatePaymentInput {
+  amount: number; // in EUR cents
+  description: string;
+  redirectUrl: string;
+  webhookUrl?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export async function createPayment(input: CreatePaymentInput) {
+  const euros = (input.amount / 100).toFixed(2);
+
+  const params: PaymentCreateParams = {
     amount: {
       currency: "EUR",
-      value: (amount / 100).toFixed(2),
+      value: euros,
     },
-    description: `Order ${orderId}`,
-    redirectUrl,
-    webhookUrl: `${process.env.NEXTAUTH_URL}/api/webhook/mollie`,
-    metadata: { orderId },
-  });
+    description: input.description,
+    redirectUrl: input.redirectUrl,
+    ...(input.webhookUrl ? { webhookUrl: input.webhookUrl } : {}),
+    ...(input.metadata ? { metadata: input.metadata } : {}),
+  };
+
+  return mollieClient.payments.create(params);
 }
 
-export async function getPayment(paymentId: string) {
-  const mollie = getMollieClient();
-  return mollie.payments.get(paymentId);
+export async function getPayment(id: string) {
+  return mollieClient.payments.get(id);
 }
-
-export { getMollieClient };
