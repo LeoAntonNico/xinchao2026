@@ -96,7 +96,6 @@ export default function OrderPage() {
 
   if (loading) return <div className="text-gray-400 p-6">{t("common.loading")}</div>;
 
-  // Step 1: Location + Time
   if (step === "location") {
     return (
       <div className="space-y-8 max-w-2xl">
@@ -147,7 +146,6 @@ export default function OrderPage() {
     );
   }
 
-  // Step 2: Menu — category tiles (BK kiosk style)
   if (!activeCat) {
     return (
       <div className="space-y-6">
@@ -161,25 +159,38 @@ export default function OrderPage() {
           <p className="text-gray-400 text-sm">Pick a category to see what we have</p>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-          {categories.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => setActiveCat(cat.id)}
-              className="group rounded-2xl border border-border-default bg-sidebar hover:border-brand-gold/50 transition-all p-6 flex flex-col items-center gap-3 text-center active:scale-95"
-            >
-              <div className="w-14 h-14 rounded-xl bg-background border border-border-default group-hover:border-brand-gold/30 flex items-center justify-center text-brand-gold">
-                {categoryIcons[cat.slug] || <ShoppingBag className="w-8 h-8" />}
-              </div>
-              <span className="font-semibold text-white">{cat.name}</span>
-              <span className="text-xs text-gray-500">{cat.items.length} items</span>
-            </button>
-          ))}
+          {categories.map((cat) => {
+            const cover = cat.items[0]?.imageUrl ?? null;
+            return (
+              <button
+                key={cat.id}
+                onClick={() => setActiveCat(cat.id)}
+                className="group relative rounded-2xl border border-border-default overflow-hidden hover:border-brand-gold/50 transition-all text-left active:scale-[0.98]"
+              >
+                <div className="h-36 sm:h-40 w-full relative">
+                  {cover ? (
+                    <img src={cover} alt={cat.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                  ) : (
+                    <div className="w-full h-full bg-background flex items-center justify-center text-brand-gold/30">
+                      {categoryIcons[cat.slug] || <ShoppingBag className="w-12 h-12" />}
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                  <div className="absolute bottom-0 left-0 right-0 p-3">
+                    <span className="font-bold text-white text-lg">{cat.name}</span>
+                    <span className="block text-xs text-gray-300 mt-0.5">
+                      {cat.items.length} {cat.items.length === 1 ? "item" : "items"}
+                    </span>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
         </div>
       </div>
     );
   }
 
-  // Step 3: Category items with photos
   return (
     <div className="space-y-6 pb-24">
       <div className="flex items-center gap-4">
@@ -194,7 +205,7 @@ export default function OrderPage() {
           <div key={item.id} className="rounded-xl border border-border-default bg-sidebar overflow-hidden flex flex-col">
             {item.imageUrl ? (
               <div className="h-40 w-full relative">
-                <Image src={item.imageUrl} alt={item.name} fill className="object-cover" sizes="(max-width: 640px) 100vw, 50vw" />
+                <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
               </div>
             ) : (
               <div className="h-40 w-full bg-background flex items-center justify-center text-gray-600">
@@ -210,7 +221,6 @@ export default function OrderPage() {
                 <span className="text-brand-gold font-bold whitespace-nowrap">{formatPrice(item.price)}</span>
               </div>
 
-              {/* Quantity controls */}
               {(() => {
                 const inCart = items.find((i) => i.menuItemId === item.id);
                 if (!inCart) {
@@ -225,7 +235,7 @@ export default function OrderPage() {
                 }
                 return (
                   <div className="mt-4 flex items-center gap-3">
-                      <button
+                    <button
                       onClick={() => decreaseItem(item.id)}
                       className="w-10 h-10 flex items-center justify-center rounded-lg bg-background border border-border-default text-white hover:border-brand-gold"
                     >
@@ -246,7 +256,6 @@ export default function OrderPage() {
         ))}
       </div>
 
-      {/* Sticky cart bottom bar */}
       {cartCount > 0 && (
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-sidebar/95 border-t border-border-default backdrop-blur z-40 flex items-center justify-between">
           <div className="flex items-center gap-3">
