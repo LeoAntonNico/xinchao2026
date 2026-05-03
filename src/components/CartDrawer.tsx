@@ -1,82 +1,79 @@
 "use client";
 
-import { useState } from "react";
-import { useCart } from "@/context/CartContext";
+import { X, Plus, Minus, ShoppingBag } from "lucide-react";
+import { useCart } from "./CartContext";
+import Link from "next/link";
+import { useLocale } from "next-intl";
 
 export default function CartDrawer() {
-  const { items, updateQuantity, total, count } = useCart();
-  const [open, setOpen] = useState(false);
+  const { items, total, isOpen, setIsOpen, updateQuantity, removeItem } = useCart();
+  const locale = useLocale();
 
-  const formatPrice = (cents: number) =>
-    `€${(cents / 100).toFixed(2).replace(".", ",")}`;
+  if (!isOpen) return null;
 
   return (
-    <div className="fixed bottom-6 right-6 z-50">
-      <button
-        onClick={() => setOpen(!open)}
-        className="relative flex h-12 w-12 items-center justify-center rounded-full bg-brand-red text-white shadow-lg hover:bg-red-700 transition-colors"
-      >
-        <span className="text-lg">&#128722;</span>
-        {count > 0 && (
-          <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-brand-gold text-[10px] font-bold text-black">
-            {count}
-          </span>
-        )}
-      </button>
+    <>
+      <div
+        className="fixed inset-0 bg-black/60 z-40"
+        onClick={() => setIsOpen(false)}
+      />
+      <div className="fixed right-0 top-0 bottom-0 w-full max-w-md bg-background border-l border-border-default z-50 flex flex-col">
+        <div className="flex items-center justify-between p-4 border-b border-border-default">
+          <h2 className="text-lg font-bold text-white flex items-center gap-2">
+            <ShoppingBag className="w-5 h-5 text-brand-gold" />
+            Your Order
+          </h2>
+          <button onClick={() => setIsOpen(false)} className="p-1 text-gray-400 hover:text-white">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
 
-      {open && (
-        <div className="absolute bottom-16 right-0 w-80 rounded-2xl border border-white/10 bg-sidebar p-4 shadow-2xl">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-white">Your Order</h3>
-            <button onClick={() => setOpen(false)} className="text-gray-400 hover:text-white">
-              X
-            </button>
-          </div>
-
-          {items.length === 0 && (
-            <p className="text-sm text-gray-400 text-center">Cart is empty</p>
-          )}
-          {items.length > 0 && (
-            <>
-              <ul className="space-y-2 mb-4">
-                {items.map((item) => (
-                  <li key={item.menuItemId} className="flex items-start justify-between border-b border-white/5 pb-2">
-                    <div>
-                      <span className="text-sm font-medium text-white">{item.name}</span>
-                      <p className="text-xs text-gray-500">{formatPrice(item.price)} ea</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => updateQuantity(item.menuItemId, item.quantity + 1)}
-                        className="flex h-6 w-6 items-center justify-center rounded bg-white/10 text-xs hover:bg-white/20"
-                      >
-                        +
-                      </button>
-                      <span className="text-sm text-white">{item.quantity}</span>
-                      <button
-                        onClick={() => updateQuantity(item.menuItemId, item.quantity - 1)}
-                        className="flex h-6 w-6 items-center justify-center rounded bg-white/10 text-xs hover:bg-white/20"
-                      >
-                        -
-                      </button>
-                    </div>
-                    <span className="text-sm font-semibold text-white">{formatPrice(item.price * item.quantity)}</span>
-                  </li>
-                ))}
-              </ul>
-              <div className="pt-2 border-t border-white/10">
-                <div className="flex justify-between text-sm font-semibold text-white mb-3">
-                  <span>Total</span>
-                  <span>{formatPrice(total)}</span>
+        <div className="flex-1 overflow-auto p-4 space-y-4">
+          {items.length === 0 ? (
+            <p className="text-gray-400 text-center py-8">Your cart is empty</p>
+          ) : (
+            items.map((item) => (
+              <div key={item.menuItemId} className="flex items-center justify-between bg-sidebar rounded-lg p-3">
+                <div>
+                  <p className="font-medium text-white text-sm">{item.name}</p>
+                  <p className="text-gray-400 text-sm">€{((item.price * item.quantity) / 100).toFixed(2).replace(".", ",")}</p>
                 </div>
-                <a href="/order" className="block w-full rounded-lg bg-brand-red py-3 text-center text-sm font-semibold text-white hover:bg-red-700 transition-colors">
-                  Checkout
-                </a>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => updateQuantity(item.menuItemId, item.quantity - 1)}
+                    className="w-7 h-7 rounded bg-gray-700 text-white flex items-center justify-center hover:bg-gray-600"
+                  >
+                    <Minus className="w-3 h-3" />
+                  </button>
+                  <span className="text-white w-6 text-center text-sm">{item.quantity}</span>
+                  <button
+                    onClick={() => updateQuantity(item.menuItemId, item.quantity + 1)}
+                    className="w-7 h-7 rounded bg-gray-700 text-white flex items-center justify-center hover:bg-gray-600"
+                  >
+                    <Plus className="w-3 h-3" />
+                  </button>
+                </div>
               </div>
-            </>
+            ))
           )}
         </div>
-      )}
-    </div>
+
+        {items.length > 0 && (
+          <div className="p-4 border-t border-border-default space-y-3">
+            <div className="flex justify-between text-white">
+              <span className="font-medium">Total</span>
+              <span className="font-bold text-brand-gold">€{(total / 100).toFixed(2).replace(".", ",")}</span>
+            </div>
+            <Link
+              href={`/${locale}/order`}
+              onClick={() => setIsOpen(false)}
+              className="block w-full text-center py-3 bg-brand-red text-white rounded-lg font-medium hover:bg-[#a01830] transition-colors"
+            >
+              Checkout
+            </Link>
+          </div>
+        )}
+      </div>
+    </>
   );
 }
