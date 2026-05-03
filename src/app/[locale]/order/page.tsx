@@ -77,7 +77,10 @@ export default function OrderPage() {
     if (selectedLocation) sessionStorage.setItem("order_locationId", selectedLocation);
   }, [selectedLocation]);
   useEffect(() => {
-    if (selectedSlot) sessionStorage.setItem("order_slotId", selectedSlot);
+    if (selectedSlot) {
+      sessionStorage.setItem("order_slotId", selectedSlot);
+      setStep("menu");
+    }
   }, [selectedSlot]);
 
   const formatDate = (dateStr: string) => {
@@ -145,17 +148,6 @@ export default function OrderPage() {
                 </button>
               ))}
             </div>
-          </div>
-        )}
-
-        {selectedLocation && selectedSlot && (
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setStep("menu")}
-              className="flex-1 py-3 bg-brand-red text-white rounded-lg font-medium hover:bg-[#a01830] transition-colors"
-            >
-              Browse Menu →
-            </button>
           </div>
         )}
       </div>
