@@ -1,0 +1,48 @@
+{
+  "nav": {
+    "home": "Home",
+    "about": "About Us",
+    "menu": "Menu",
+    "order": "Order",
+    "reserve": "Reserve"
+  },
+  "home": {
+    "welcome": "Welcome to Vietnamese Restaurant Xin Chao",
+    "orderOnline": "Order Online",
+    "reserveTable": "Reserve Table",
+    "openingHours": "Opening Hours"
+  },
+  "days": {
+    "monday": "Monday",
+    "tuesday": "Tuesday",
+    "wednesday": "Wednesday",
+    "thursday": "Thursday",
+    "friday": "Friday",
+    "saturday": "Saturday",
+    "sunday": "Sunday"
+  },
+  "order": {
+    "payWithMollie": "Pay with Mollie",
+    "addToCart": "Add to cart",
+    "selectLocation": "Select location",
+    "selectPickupTime": "Select pickup time",
+    "checkout": "Checkout",
+    "yourName": "Your name",
+    "phone": "Phone number",
+    "email": "Email (optional)",
+    "notes": "Notes",
+    "confirm": "Confirm order"
+  },
+  "reservation": {
+    "selectDate": "Select date",
+    "selectTime": "Select time",
+    "partySize": "Number of guests",
+    "book": "Book table"
+  },
+  "common": {
+    "loading": "Loading...",
+    "submit": "Submit",
+    "cancel": "Cancel",
+    "close": "Close"
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "nav": {
+    "home": "Home",
+    "about": "Over Ons",
+    "menu": "Menu",
+    "order": "Bestellen",
+    "reserve": "Reserveren"
+  },
+  "home": {
+    "welcome": "Welkom bij Vietnamees Restaurant Xin Chao",
+    "orderOnline": "Online Bestellen",
+    "reserveTable": "Tafel Reserveren",
+    "openingHours": "Openingstijden"
+  },
+  "days": {
+    "monday": "Maandag",
+    "tuesday": "Dinsdag",
+    "wednesday": "Woensdag",
+    "thursday": "Donderdag",
+    "friday": "Vrijdag",
+    "saturday": "Zaterdag",
+    "sunday": "Zondag"
+  },
+  "order": {
+    "payWithMollie": "Betaal met Mollie",
+    "addToCart": "Toevoegen",
+    "selectLocation": "Kies vestiging",
+    "selectPickupTime": "Kies tijd",
+    "checkout": "Afrekenen",
+    "yourName": "Uw naam",
+    "phone": "Telefoonnummer",
+    "email": "E-mail (optioneel)",
+    "notes": "Opmerkingen",
+    "confirm": "Bestelling bevestigen"
+  },
+  "reservation": {
+    "selectDate": "Kies datum",
+    "selectTime": "Kies tijd",
+    "partySize": "Aantal personen",
+    "book": "Reserveren"
+  },
+  "common": {
+    "loading": "Laden...",
+    "submit": "Versturen",
+    "cancel": "Annuleren",
+    "close": "Sluiten"
+  }
+}
