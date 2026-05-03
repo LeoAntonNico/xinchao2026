@@ -61,21 +61,33 @@ async function main() {
   const getCatId = (slug: string) => cats.find((c) => c.slug === slug)!.id;
 
   console.log("Seeding menu items...");
+  const images = {
+    phobo: "https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=400&h=300&fit=crop",
+    phoga: "https://images.unsplash.com/photo-1547592180-85f173990554?w=400&h=300&fit=crop",
+    buncha: "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=400&h=300&fit=crop",
+    bunthit: "https://images.unsplash.com/photo-1555126634-323283e090fa?w=400&h=300&fit=crop",
+    comtam: "https://images.unsplash.com/photo-1604882355165-4450cb6155b2?w=400&h=300&fit=crop",
+    comga: "https://images.unsplash.com/photo-1603133872878-684f208fb84b?w=400&h=300&fit=crop",
+    goicuon: "https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?w=400&h=300&fit=crop",
+    tra: "https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=400&h=300&fit=crop",
+    caphe: "https://images.unsplash.com/photo-1514432324607-a09d9b4aefda?w=400&h=300&fit=crop",
+  };
+
   await prisma.menuItem.createMany({
     data: [
       // Utrecht items
-      { name: "Phở Bò", description: "Traditional beef noodle soup with herbs", price: 1395, categoryId: getCatId("pho"), locationId: utrecht.id, sortOrder: 1 },
-      { name: "Phở Gà", description: "Chicken noodle soup with fresh herbs", price: 1295, categoryId: getCatId("pho"), locationId: utrecht.id, sortOrder: 2 },
-      { name: "Bún Chả", description: "Grilled pork with vermicelli noodles", price: 1495, categoryId: getCatId("bun"), locationId: utrecht.id, sortOrder: 1 },
-      { name: "Cơm Tấm", description: "Broken rice with grilled pork chop", price: 1345, categoryId: getCatId("com"), locationId: utrecht.id, sortOrder: 1 },
-      { name: "Gỏi Cuốn", description: "Fresh spring rolls with shrimp and herbs", price: 795, categoryId: getCatId("goi"), locationId: utrecht.id, sortOrder: 1 },
-      { name: "Trà Đá", description: "Vietnamese iced tea", price: 295, categoryId: getCatId("drinks"), locationId: utrecht.id, sortOrder: 1 },
-      { name: "Cà Phê Sữa Đá", description: "Vietnamese iced coffee", price: 395, categoryId: getCatId("drinks"), locationId: utrecht.id, sortOrder: 2 },
+      { name: "Phở Bò", description: "Traditional beef noodle soup with herbs", price: 1395, imageUrl: images.phobo, categoryId: getCatId("pho"), locationId: utrecht.id, sortOrder: 1 },
+      { name: "Phở Gà", description: "Chicken noodle soup with fresh herbs", price: 1295, imageUrl: images.phoga, categoryId: getCatId("pho"), locationId: utrecht.id, sortOrder: 2 },
+      { name: "Bún Chả", description: "Grilled pork with vermicelli noodles", price: 1495, imageUrl: images.buncha, categoryId: getCatId("bun"), locationId: utrecht.id, sortOrder: 1 },
+      { name: "Cơm Tấm", description: "Broken rice with grilled pork chop", price: 1345, imageUrl: images.comtam, categoryId: getCatId("com"), locationId: utrecht.id, sortOrder: 1 },
+      { name: "Gỏi Cuốn", description: "Fresh spring rolls with shrimp and herbs", price: 795, imageUrl: images.goicuon, categoryId: getCatId("goi"), locationId: utrecht.id, sortOrder: 1 },
+      { name: "Trà Đá", description: "Vietnamese iced tea", price: 295, imageUrl: images.tra, categoryId: getCatId("drinks"), locationId: utrecht.id, sortOrder: 1 },
+      { name: "Cà Phê Sữa Đá", description: "Vietnamese iced coffee", price: 395, imageUrl: images.caphe, categoryId: getCatId("drinks"), locationId: utrecht.id, sortOrder: 2 },
       // Wageningen items
-      { name: "Phở Bò", description: "Traditional beef noodle soup with herbs", price: 1395, categoryId: getCatId("pho"), locationId: wageningen.id, sortOrder: 1 },
-      { name: "Bún Thịt Nướng", description: "Grilled pork with vermicelli and salad", price: 1445, categoryId: getCatId("bun"), locationId: wageningen.id, sortOrder: 1 },
-      { name: "Cơm Gà", description: "Chicken rice with ginger sauce", price: 1295, categoryId: getCatId("com"), locationId: wageningen.id, sortOrder: 1 },
-      { name: "Trà Đá", description: "Vietnamese iced tea", price: 295, categoryId: getCatId("drinks"), locationId: wageningen.id, sortOrder: 1 },
+      { name: "Phở Bò", description: "Traditional beef noodle soup with herbs", price: 1395, imageUrl: images.phobo, categoryId: getCatId("pho"), locationId: wageningen.id, sortOrder: 1 },
+      { name: "Bún Thịt Nướng", description: "Grilled pork with vermicelli and salad", price: 1445, imageUrl: images.bunthit, categoryId: getCatId("bun"), locationId: wageningen.id, sortOrder: 1 },
+      { name: "Cơm Gà", description: "Chicken rice with ginger sauce", price: 1295, imageUrl: images.comga, categoryId: getCatId("com"), locationId: wageningen.id, sortOrder: 1 },
+      { name: "Trà Đá", description: "Vietnamese iced tea", price: 295, imageUrl: images.tra, categoryId: getCatId("drinks"), locationId: wageningen.id, sortOrder: 1 },
     ],
   });
 
