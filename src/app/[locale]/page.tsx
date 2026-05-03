@@ -18,7 +18,7 @@ export default async function HomePage({
 
   return (
     <div className="space-y-16">
-      <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#1a1a1a] to-[#252525] border border-[#333] p-8 md:p-16">
+      <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#1a1a1a] to-[#111111] border border-[#333] p-8 md:p-16">
         <div className="absolute top-0 right-0 w-64 h-64 bg-[#c41e3a]/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
         <h1 className="text-3xl md:text-5xl font-bold text-white mb-4 relative z-10">
           {t("hero.title")}
