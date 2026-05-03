@@ -1,33 +1,38 @@
 {
   "nav": {
     "home": "Home",
-    "about": "Over Ons",
     "menu": "Menu",
     "order": "Bestellen",
-    "reserve": "Reserveren"
+    "reserve": "Reserveren",
+    "contact": "Contact"
+  },
+  "hero": {
+    "title": "Authentieke Vietnamese Keuken",
+    "subtitle": "Phở, Bún, Cơm en meer — bestel online of kom bij ons eten",
+    "orderCta": "Online Bestellen",
+    "reserveCta": "Tafel Reserveren"
+  },
+  "locations": {
+    "title": "Onze Locaties",
+    "address": "Adres",
+    "phone": "Telefoon",
+    "hours": "Openingstijden",
+    "directions": "Routebeschrijving"
   },
   "home": {
-    "welcome": "Welkom bij Vietnamees Restaurant Xin Chao",
     "orderOnline": "Online Bestellen",
     "reserveTable": "Tafel Reserveren",
     "openingHours": "Openingstijden"
   },
-  "days": {
-    "monday": "Maandag",
-    "tuesday": "Dinsdag",
-    "wednesday": "Woensdag",
-    "thursday": "Donderdag",
-    "friday": "Vrijdag",
-    "saturday": "Zaterdag",
-    "sunday": "Zondag"
+  "menu": {
+    "addToCart": "Toevoegen",
+    "categories": "Categorieën"
   },
   "order": {
-    "payWithMollie": "Betaal met Mollie",
-    "addToCart": "Toevoegen",
-    "selectLocation": "Kies vestiging",
-    "selectPickupTime": "Kies tijd",
+    "selectLocation": "Kies locatie",
+    "selectPickupTime": "Kies afhaaltijd",
     "checkout": "Afrekenen",
-    "yourName": "Uw naam",
+    "yourName": "Jouw naam",
     "phone": "Telefoonnummer",
     "email": "E-mail (optioneel)",
     "notes": "Opmerkingen",
@@ -36,7 +41,7 @@
   "reservation": {
     "selectDate": "Kies datum",
     "selectTime": "Kies tijd",
-    "partySize": "Aantal personen",
+    "partySize": "Aantal gasten",
     "book": "Reserveren"
   },
   "common": {

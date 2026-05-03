@@ -1,14 +1,24 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createPayment } from "@/lib/mollie";
+import { Prisma } from "@prisma/client";
+
+interface OrderItemInput {
+  price: number;
+  quantity: number;
+  menuItemId: string;
+}
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
     const { items, locationId, slot: slotId, name, phone, email, notes } = body;
-    const total = items.reduce((sum: number, i: any) => sum + i.price * i.quantity, 0);
+    const total = items.reduce(
+      (sum: number, i: OrderItemInput) => sum + i.price * i.quantity,
+      0
+    );
 
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const slot = await tx.pickupSlot.update({
         where: { id: slotId },
         data: { booked: { increment: 1 } },
@@ -28,7 +38,7 @@ export async function POST(req: Request) {
         locationId,
         pickupSlotId: slotId,
         items: {
-          create: items.map((i: any) => ({
+          create: (items as OrderItemInput[]).map((i) => ({
             quantity: i.quantity,
             price: i.price,
             menuItemId: i.menuItemId,
@@ -37,11 +47,13 @@ export async function POST(req: Request) {
       },
     });
 
-    const payment = await createPayment(
-      total,
-      order.id,
-      `${process.env.NEXTAUTH_URL}/order/confirmation`
-    );
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "";
+    const payment = await createPayment({
+      amount: total,
+      description: `Order ${order.id}`,
+      redirectUrl: `${baseUrl}/en/order/confirmation?orderId=${order.id}`,
+      metadata: { orderId: order.id },
+    });
 
     await prisma.order.update({
       where: { id: order.id },
@@ -49,8 +61,9 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json({ paymentUrl: payment.getCheckoutUrl() });
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error(e);
-    return NextResponse.json({ error: e.message }, { status: 500 });
+    const message = e instanceof Error ? e.message : "Unknown error";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

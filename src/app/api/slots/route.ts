@@ -13,7 +13,7 @@ export async function GET(req: Request) {
   const end = new Date(today);
   end.setDate(today.getDate() + days);
 
-  const slotsRaw = await prisma.pickupSlot.findMany({
+  const slotsRaw: { id: string; date: Date; time: string; capacity: number; booked: number }[] = await prisma.pickupSlot.findMany({
     where: { locationId, date: { gte: today, lt: end } },
     orderBy: [{ date: "asc" }, { time: "asc" }],
     select: { id: true, date: true, time: true, capacity: true, booked: true },

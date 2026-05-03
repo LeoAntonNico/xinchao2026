@@ -1,76 +1,82 @@
-// src/app/[locale]/page.tsx
-import { getTranslations } from "next-intl/server";
 import Link from "next/link";
+import { getTranslations, setRequestLocale } from "next-intl/server";
+import { MapPin, Phone, Clock, ArrowRight } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 
-export default async function HomePage({ params }: { params: { locale: string } }) {
-  const t = await getTranslations();
+export default async function HomePage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
   const { locale } = await params;
-  const locations = await prisma.location.findMany();
+  setRequestLocale(locale);
+  const t = await getTranslations();
+
+  const locations: { id: string; name: string; address: string; phone: string; openTime: string; closeTime: string }[] = await prisma.location.findMany({
+    orderBy: { createdAt: "asc" },
+  });
 
   return (
-    <div className="min-h-full">
-      {/* Hero */}
-      <section className="relative flex h-[70vh] items-center justify-center overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-background via-sidebar to-background" />
-        <div className="relative z-10 text-center px-6">
-          <div className="inline-flex items-center gap-2 rounded-full border border-ghost-border px-4 py-1.5 mb-6">
-            <span className="h-2 w-2 rounded-full bg-brand-red animate-pulse" />
-            <span className="text-xs font-medium text-gray-300 tracking-wide uppercase">
-              Now Open
-            </span>
-          </div>
-          <h2 className="text-5xl md:text-7xl font-bold text-white tracking-tight">
-            Xin Ch<span className="text-brand-gold">à</span>o
-          </h2>
-          <p className="mt-4 text-lg text-gray-400 max-w-md mx-auto">
-            Authentic Vietnamese flavors in the heart of the Netherlands
-          </p>
-          <div className="mt-8 flex items-center justify-center gap-4">
-            <Link
-              href={"/" + locale + "/order"}
-              className="inline-flex items-center gap-2 rounded-full bg-brand-red px-6 py-3 text-sm font-semibold text-white hover:bg-red-700 transition-colors"
-            >
-              {t("home.orderOnline")}
-            </Link>
-            <Link
-              href={"/" + locale + "/reserve"}
-              className="inline-flex items-center gap-2 rounded-full border border-ghost-border px-6 py-3 text-sm font-semibold text-white hover:bg-white/5 transition-colors"
-            >
-              {t("home.reserveTable")}
-            </Link>
-          </div>
+    <div className="space-y-16">
+      <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#1a1a1a] to-[#252525] border border-[#333] p-8 md:p-16">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-[#c41e3a]/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+        <h1 className="text-3xl md:text-5xl font-bold text-white mb-4 relative z-10">
+          {t("hero.title")}
+        </h1>
+        <p className="text-lg md:text-xl text-gray-300 mb-8 max-w-xl relative z-10">
+          {t("hero.subtitle")}
+        </p>
+        <div className="flex flex-wrap gap-4 relative z-10">
+          <Link
+            href={`/${locale}/order`}
+            className="inline-flex items-center gap-2 px-6 py-3 bg-[#c41e3a] text-white rounded-lg font-medium hover:bg-[#a01830] transition-colors"
+          >
+            {t("hero.orderCta")}
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+          <Link
+            href={`/${locale}/reserve`}
+            className="inline-flex items-center gap-2 px-6 py-3 border border-[#555] text-white rounded-lg font-medium hover:bg-[#333] transition-colors"
+          >
+            {t("hero.reserveCta")}
+          </Link>
         </div>
       </section>
 
-      {/* Locations */}
-      <section className="py-20 px-8">
-        <h3 className="text-2xl font-bold text-white mb-2">Our Locations</h3>
-        <p className="text-gray-400 mb-8">Two cities, one passion for Vietnamese cuisine</p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <section>
+        <h2 className="text-2xl font-bold text-white mb-6">
+          {t("locations.title")}
+        </h2>
+        <div className="grid md:grid-cols-2 gap-6">
           {locations.map((loc) => (
-            <div
-              key={loc.id}
-              className="group rounded-2xl border border-white/5 bg-sidebar p-6 hover:border-brand-gold/30 transition-all"
-            >
-              <h4 className="text-xl font-semibold text-white group-hover:text-brand-gold transition-colors">
+            <div key={loc.id} className="bg-[#252525] border border-[#333] rounded-xl p-6 hover:border-[#555] transition-colors">
+              <h3 className="text-xl font-bold text-[#d4a017] mb-2">
                 {loc.name}
-              </h4>
-              <p className="mt-2 text-sm text-gray-400">{loc.address}</p>
-              <p className="mt-1 text-sm text-gray-500">{loc.phone}</p>
-              <div className="mt-4 flex items-center gap-2 text-xs text-gray-500">
-                <span className="inline-block h-1.5 w-1.5 rounded-full bg-brand-gold" />
-                Open {loc.openTime} - {loc.closeTime}
+              </h3>
+              <div className="space-y-3 text-gray-300">
+                <div className="flex items-start gap-3">
+                  <MapPin className="w-5 h-5 text-[#c41e3a] mt-0.5 shrink-0" />
+                  <span>
+                    {loc.address}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Phone className="w-5 h-5 text-[#c41e3a] shrink-0" />
+                  <span>
+                    {loc.phone}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Clock className="w-5 h-5 text-[#c41e3a] shrink-0" />
+                  <span>
+                    {loc.openTime} – {loc.closeTime}
+                  </span>
+                </div>
               </div>
             </div>
           ))}
         </div>
       </section>
-
-      {/* Footer */}
-      <footer className="border-t border-white/5 py-8 px-8 text-center text-xs text-gray-600">
-        <p> Xin Chào Restaurant. All rights reserved.</p>
-      </footer>
     </div>
   );
 }

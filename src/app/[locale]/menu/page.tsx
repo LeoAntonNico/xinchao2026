@@ -1,11 +1,19 @@
 import { prisma } from "@/lib/prisma";
-import { getTranslations } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
+import { Prisma } from "@prisma/client";
 
-export default async function MenuPage({ params }: { params: { locale: string } }) {
-  const t = await getTranslations();
+type CategoryWithItems = Prisma.MenuCategoryGetPayload<{
+  include: {
+    items: { where: { isAvailable: true }; orderBy: { sortOrder: "asc" } };
+  };
+}>;
+
+export default async function MenuPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
+  setRequestLocale(locale);
+  const t = await getTranslations();
 
-  const categories = await prisma.menuCategory.findMany({
+  const categories: CategoryWithItems[] = await prisma.menuCategory.findMany({
     include: {
       items: { where: { isAvailable: true }, orderBy: { sortOrder: "asc" } },
     },
@@ -16,14 +24,16 @@ export default async function MenuPage({ params }: { params: { locale: string } 
     `€${(cents / 100).toFixed(2).replace(".", ",")}`;
 
   return (
-    <div className="p-8 max-w-5xl">
-      <h1 className="text-3xl font-bold text-white mb-2">{t("nav.menu")}</h1>
-      <p className="text-gray-400 mb-8">Authentic Vietnamese dishes, made fresh daily</p>
+    <div className="space-y-10">
+      <div>
+        <h1 className="text-3xl font-bold text-white mb-2">{t("nav.menu")}</h1>
+        <p className="text-gray-400">Authentic Vietnamese dishes, made fresh daily</p>
+      </div>
 
       <div className="space-y-10">
-        {categories.map((cat) => (
+        {categories.map((cat: CategoryWithItems) => (
           <section key={cat.id}>
-            <h2 className="text-xl font-semibold text-brand-gold mb-4 flex items-center gap-2">
+            <h2 className="text-xl font-semibold text-[#d4a017] mb-4 flex items-center gap-2">
               {cat.name}
               <span className="h-px flex-1 bg-white/5" />
             </h2>
@@ -31,26 +41,17 @@ export default async function MenuPage({ params }: { params: { locale: string } 
               {cat.items.map((item) => (
                 <div
                   key={item.id}
-                  className="group flex items-start justify-between rounded-xl border border-white/5 bg-sidebar p-4 hover:border-brand-gold/30 transition-all"
+                  className="group flex items-start justify-between rounded-xl border border-white/5 bg-[#252525] p-4 hover:border-[#d4a017]/30 transition-all"
                 >
                   <div className="flex-1">
-                    <h3 className="font-medium text-white group-hover:text-brand-gold transition-colors">
+                    <h3 className="font-medium text-white group-hover:text-[#d4a017] transition-colors">
                       {item.name}
                     </h3>
                     {item.description && (
-                      <p className="mt-1 text-sm text-gray-400">{item.description}</p>
+                      <p className="text-sm text-gray-400 mt-1">{item.description}</p>
                     )}
-                    <p className="mt-2 text-sm font-semibold text-white">
-                      {formatPrice(item.price)}
-                    </p>
                   </div>
-                  <a
-                    href={`/${locale}/order?item=${item.id}`}
-                    className="ml-4 inline-flex h-8 w-8 items-center justify-center rounded-full bg-brand-red text-white text-sm font-bold hover:bg-red-700 transition-colors"
-                    title="Add to cart"
-                  >
-                    +
-                  </a>
+                  <span className="font-semibold text-white ml-4">{formatPrice(item.price)}</span>
                 </div>
               ))}
             </div>
