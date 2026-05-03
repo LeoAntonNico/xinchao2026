@@ -1,8 +1,11 @@
-// prisma/seed.ts
 import "dotenv/config";
+import { Pool } from "pg";
+import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 
-const prisma = new PrismaClient();
+const pool = new Pool({ connectionString: process.env["DATABASE_URL"] });
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
 
 async function main() {
   // Clear existing data
@@ -14,7 +17,7 @@ async function main() {
   await prisma.menuCategory.deleteMany();
   await prisma.location.deleteMany();
 
-  // Create locations
+  console.log("Seeding locations...");
   const utrecht = await prisma.location.create({
     data: {
       name: "Xin Chào Utrecht",
@@ -25,7 +28,6 @@ async function main() {
       openTime: "12:00",
       closeTime: "21:30",
       capacity: 50,
-      mapEmbedUrl: "https://maps.google.com/?q=Janskerkhof+15+Utrecht",
     },
   });
 
@@ -39,11 +41,10 @@ async function main() {
       openTime: "12:00",
       closeTime: "20:30",
       capacity: 35,
-      mapEmbedUrl: "https://maps.google.com/?q=Stationsstraat+32+Wageningen",
     },
   });
 
-  // Create categories
+  console.log("Seeding categories...");
   const categories = [
     { name: "Phở", slug: "pho", sortOrder: 1 },
     { name: "Bún", slug: "bun", sortOrder: 2 },
@@ -57,139 +58,67 @@ async function main() {
   }
 
   const cats = await prisma.menuCategory.findMany();
-
-  // Helper to get category id
   const getCatId = (slug: string) => cats.find((c) => c.slug === slug)!.id;
 
-  // Menu items for Utrecht
-  await prisma.menuItem.create({
-    data: {
-      name: "Phở Bò",
-      description: "Traditional beef noodle soup with herbs",
-      price: 1395,
-      imageUrl: "https://images.unsplash.com/photo-1582878826629-65b9495f3ae8?w=400",
-      categoryId: getCatId("pho"),
-      locationId: utrecht.id,
-    },
+  console.log("Seeding menu items...");
+  await prisma.menuItem.createMany({
+    data: [
+      // Utrecht items
+      { name: "Phở Bò", description: "Traditional beef noodle soup with herbs", price: 1395, categoryId: getCatId("pho"), locationId: utrecht.id, sortOrder: 1 },
+      { name: "Phở Gà", description: "Chicken noodle soup with fresh herbs", price: 1295, categoryId: getCatId("pho"), locationId: utrecht.id, sortOrder: 2 },
+      { name: "Bún Chả", description: "Grilled pork with vermicelli noodles", price: 1495, categoryId: getCatId("bun"), locationId: utrecht.id, sortOrder: 1 },
+      { name: "Cơm Tấm", description: "Broken rice with grilled pork chop", price: 1345, categoryId: getCatId("com"), locationId: utrecht.id, sortOrder: 1 },
+      { name: "Gỏi Cuốn", description: "Fresh spring rolls with shrimp and herbs", price: 795, categoryId: getCatId("goi"), locationId: utrecht.id, sortOrder: 1 },
+      { name: "Trà Đá", description: "Vietnamese iced tea", price: 295, categoryId: getCatId("drinks"), locationId: utrecht.id, sortOrder: 1 },
+      { name: "Cà Phê Sữa Đá", description: "Vietnamese iced coffee", price: 395, categoryId: getCatId("drinks"), locationId: utrecht.id, sortOrder: 2 },
+      // Wageningen items
+      { name: "Phở Bò", description: "Traditional beef noodle soup with herbs", price: 1395, categoryId: getCatId("pho"), locationId: wageningen.id, sortOrder: 1 },
+      { name: "Bún Thịt Nướng", description: "Grilled pork with vermicelli and salad", price: 1445, categoryId: getCatId("bun"), locationId: wageningen.id, sortOrder: 1 },
+      { name: "Cơm Gà", description: "Chicken rice with ginger sauce", price: 1295, categoryId: getCatId("com"), locationId: wageningen.id, sortOrder: 1 },
+      { name: "Trà Đá", description: "Vietnamese iced tea", price: 295, categoryId: getCatId("drinks"), locationId: wageningen.id, sortOrder: 1 },
+    ],
   });
 
-  await prisma.menuItem.create({
-    data: {
-      name: "Phở Gà",
-      description: "Chicken noodle soup with fresh herbs",
-      price: 1295,
-      categoryId: getCatId("pho"),
-      locationId: utrecht.id,
-    },
-  });
-
-  await prisma.menuItem.create({
-    data: {
-      name: "Bún Chả",
-      description: "Grilled pork with vermicelli noodles",
-      price: 1495,
-      categoryId: getCatId("bun"),
-      locationId: utrecht.id,
-    },
-  });
-
-  await prisma.menuItem.create({
-    data: {
-      name: "Cơm Tấm",
-      description: "Broken rice with grilled pork chop",
-      price: 1345,
-      categoryId: getCatId("com"),
-      locationId: utrecht.id,
-    },
-  });
-
-  await prisma.menuItem.create({
-    data: {
-      name: "Gỏi Cuốn",
-      description: "Fresh spring rolls with shrimp and herbs",
-      price: 895,
-      categoryId: getCatId("goi"),
-      locationId: utrecht.id,
-    },
-  });
-
-  await prisma.menuItem.create({
-    data: {
-      name: "Cà Phê Sữa Đá",
-      description: "Vietnamese iced coffee with condensed milk",
-      price: 495,
-      categoryId: getCatId("drinks"),
-      locationId: utrecht.id,
-    },
-  });
-
-  // Menu items for Wageningen (same items)
-  const wagItems = [
-    { name: "Phở Bò", desc: "Traditional beef noodle soup", price: 1295, cat: "pho" },
-    { name: "Phở Gà", desc: "Chicken noodle soup", price: 1195, cat: "pho" },
-    { name: "Bún Chả", desc: "Grilled pork with vermicelli", price: 1395, cat: "bun" },
-    { name: "Cơm Tấm", desc: "Broken rice with pork chop", price: 1245, cat: "com" },
-    { name: "Gỏi Cuốn", desc: "Fresh spring rolls", price: 795, cat: "goi" },
-    { name: "Trà Đào", desc: "Peach iced tea", price: 395, cat: "drinks" },
-  ];
-
-  for (const item of wagItems) {
-    await prisma.menuItem.create({
-      data: {
-        name: item.name,
-        description: item.desc,
-        price: item.price,
-        categoryId: getCatId(item.cat),
-        locationId: wageningen.id,
-      },
-    });
-  }
-
-  // Generate pickup slots for next 7 days
+  console.log("Seeding pickup slots...");
   const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  for (let day = 1; day <= 7; day++) {
+    const date = new Date(today);
+    date.setDate(today.getDate() + day);
+    const dateStr = date.toISOString().split("T")[0];
 
-  const locations = [utrecht, wageningen];
-  for (const loc of locations) {
-    const [openH, openM] = loc.openTime.split(":").map(Number);
-    const [closeH, closeM] = loc.closeTime.split(":").map(Number);
-
-    for (let d = 0; d < 7; d++) {
-      const date = new Date(today);
-      date.setDate(date.getDate() + d);
-
-      for (let h = openH; h <= closeH - 1; h++) {
-        for (const m of [0, 30]) {
-          if (h === closeH - 1 && m >= closeM) continue;
-
-          const timeStr = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-          const exists = await prisma.pickupSlot.findUnique({
-            where: { locationId_date_time: { locationId: loc.id, date, time: timeStr } },
-          });
-
-          if (!exists) {
-            await prisma.pickupSlot.create({
-              data: {
-                date,
-                time: timeStr,
-                capacity: 10,
-                locationId: loc.id,
-              },
-            });
-          }
-        }
-      }
+    const times = ["12:00", "12:30", "13:00", "13:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00"];
+    for (const time of times) {
+      await prisma.pickupSlot.create({
+        data: {
+          date: new Date(dateStr),
+          time,
+          capacity: 10,
+          locationId: utrecht.id,
+        },
+      });
+      await prisma.pickupSlot.create({
+        data: {
+          date: new Date(dateStr),
+          time,
+          capacity: 8,
+          locationId: wageningen.id,
+        },
+      });
     }
   }
 
-  console.log("Seed complete!");
+  console.log("Seeding complete!");
 }
 
 main()
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
-  })
-  .finally(async () => {
+  .then(async () => {
     await prisma.$disconnect();
+    await pool.end();
+    process.exit(0);
+  })
+  .catch(async (e) => {
+    console.error(e);
+    await prisma.$disconnect();
+    await pool.end();
+    process.exit(1);
   });
