@@ -1,8 +1,10 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useCart } from "@/components/CartContext";
+import Link from "next/link";
 import { MapPin, Clock, ShoppingBag } from "lucide-react";
 
 interface Location {
@@ -39,7 +41,7 @@ interface MenuItem {
 export default function OrderPage() {
   const t = useTranslations();
   const locale = useLocale();
-  const { addItem, setIsOpen } = useCart();
+  const { addItem, setIsOpen, items } = useCart();
 
   const [locations, setLocations] = useState<Location[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<string>("");
@@ -49,32 +51,34 @@ export default function OrderPage() {
   const [loading, setLoading] = useState(true);
   const [step, setStep] = useState<"location" | "menu">("location");
 
-  // Load locations on mount
+  // Load locations
   useEffect(() => {
     fetch("/api/locations")
       .then((r) => r.json())
-      .then(setLocations)
-      .finally(() => setLoading(false));
+      .then((data) => {
+        setLocations(data);
+        setLoading(false);
+      });
   }, []);
 
-  // Load slots when location selected
+  // Load slots and menu when location selected
   useEffect(() => {
     if (!selectedLocation) return;
     fetch(`/api/slots?locationId=${selectedLocation}&days=7`)
       .then((r) => r.json())
-      .then((data) => {
-        setSlots(data);
-        setSelectedSlot("");
-      });
-  }, [selectedLocation]);
-
-  // Load menu when location selected
-  useEffect(() => {
-    if (!selectedLocation) return;
+      .then(setSlots);
     fetch(`/api/menu?locationId=${selectedLocation}`)
       .then((r) => r.json())
       .then(setCategories);
   }, [selectedLocation]);
+
+  // Persist to sessionStorage
+  useEffect(() => {
+    if (selectedLocation) sessionStorage.setItem("order_locationId", selectedLocation);
+  }, [selectedLocation]);
+  useEffect(() => {
+    if (selectedSlot) sessionStorage.setItem("order_slotId", selectedSlot);
+  }, [selectedSlot]);
 
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr);
@@ -98,9 +102,7 @@ export default function OrderPage() {
           {locations.map((loc) => (
             <button
               key={loc.id}
-              onClick={() => {
-                setSelectedLocation(loc.id);
-              }}
+              onClick={() => setSelectedLocation(loc.id)}
               className={`text-left p-6 rounded-xl border transition-colors ${
                 selectedLocation === loc.id
                   ? "border-brand-gold bg-sidebar"
@@ -123,7 +125,10 @@ export default function OrderPage() {
 
         {selectedLocation && (
           <div className="space-y-4">
-            <h2 className="text-xl font-semibold text-white">{t("order.selectPickupTime")}</h2>
+            <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+              <Clock className="w-5 h-5 text-brand-gold" />
+              {t("order.selectPickupTime")}
+            </h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
               {slots.map((slot) => (
                 <button
@@ -144,12 +149,14 @@ export default function OrderPage() {
         )}
 
         {selectedLocation && selectedSlot && (
-          <button
-            onClick={() => setStep("menu")}
-            className="w-full py-3 bg-brand-red text-white rounded-lg font-medium hover:bg-[#a01830] transition-colors"
-          >
-            {t("menu.categories")} →
-          </button>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setStep("menu")}
+              className="flex-1 py-3 bg-brand-red text-white rounded-lg font-medium hover:bg-[#a01830] transition-colors"
+            >
+              Browse Menu →
+            </button>
+          </div>
         )}
       </div>
     );
@@ -167,6 +174,23 @@ export default function OrderPage() {
           ← {t("order.selectLocation")}
         </button>
       </div>
+
+      {/* Cart summary + checkout link when items exist */}
+      {items.length > 0 && (
+        <div className="sticky top-4 z-30 bg-gray-800/95 border border-border-default rounded-xl p-4 flex items-center justify-between backdrop-blur">
+          <div className="text-sm text-gray-300">
+            <span className="font-semibold text-white">{items.reduce((s, i) => s + i.quantity, 0)} items</span>
+            <span className="mx-2">·</span>
+            <span className="text-brand-gold font-semibold">{formatPrice(items.reduce((s, i) => s + i.price * i.quantity, 0))}</span>
+          </div>
+          <Link
+            href={`/${locale}/checkout`}
+            className="px-4 py-2 bg-brand-red text-white rounded-lg text-sm font-medium hover:bg-[#a01830] transition-colors"
+          >
+            {t("order.checkout")} →
+          </Link>
+        </div>
+      )}
 
       <div className="space-y-10">
         {categories.map((cat) => (
