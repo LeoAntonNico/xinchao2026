@@ -27,6 +27,39 @@ interface ProductModalProps {
   locations: Location[];
 }
 
+function CheckCard({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onChange}
+      className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition-colors ${
+        checked
+          ? "border-brand-red bg-brand-red/15 text-white"
+          : "border-border-default text-gray-300 hover:border-gray-500"
+      }`}
+    >
+      <span
+        className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
+          checked
+            ? "bg-brand-red border-brand-red"
+            : "border-gray-500 bg-transparent"
+        }`}
+      >
+        {checked && <span className="text-white text-xs font-bold">✓</span>}
+      </span>
+      {label}
+    </button>
+  );
+}
+
 export function ProductModal({ isOpen, onClose, onSave, editingItem, categories, locations }: ProductModalProps) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -191,30 +224,33 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-gray-400 mb-1">Category</label>
-              <select
-                value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
-                className="w-full bg-background border border-border-default rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-500"
-              >
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
+          {/* Category tick boxes */}
+          <div>
+            <label className="block text-xs font-medium text-gray-400 mb-2">Category</label>
+            <div className="flex flex-wrap gap-2">
+              {categories.map((c) => (
+                <CheckCard
+                  key={c.id}
+                  label={c.name}
+                  checked={categoryId === c.id}
+                  onChange={() => setCategoryId(c.id)}
+                />
+              ))}
             </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-400 mb-1">Location</label>
-              <select
-                value={locationId}
-                onChange={(e) => setLocationId(e.target.value)}
-                className="w-full bg-background border border-border-default rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-500"
-              >
-                {locations.map((l) => (
-                  <option key={l.id} value={l.id}>{l.name}</option>
-                ))}
-              </select>
+          </div>
+
+          {/* Location tick boxes */}
+          <div>
+            <label className="block text-xs font-medium text-gray-400 mb-2">Location</label>
+            <div className="flex flex-wrap gap-2">
+              {locations.map((l) => (
+                <CheckCard
+                  key={l.id}
+                  label={l.name}
+                  checked={locationId === l.id}
+                  onChange={() => setLocationId(l.id)}
+                />
+              ))}
             </div>
           </div>
 
