@@ -1,6 +1,6 @@
-
 import { prisma } from "@/lib/prisma";
 import { requireAdminAuth } from "@/lib/require-admin";
+import { ReservationStatusCell } from "@/components/admin/ReservationStatusCell";
 
 interface ReservationWithLocation {
   id: string;
@@ -20,13 +20,6 @@ export default async function AdminReservationsPage() {
     include: { location: true },
     take: 50,
   });
-
-  const statusStyles: Record<string, string> = {
-    CONFIRMED: "bg-green-500/20 text-green-400",
-    SEATED: "bg-blue-500/20 text-blue-400",
-    CANCELLED: "bg-red-500/20 text-red-400",
-    NO_SHOW: "bg-gray-500/20 text-gray-400",
-  };
 
   return (
     <div className="space-y-8">
@@ -58,9 +51,7 @@ export default async function AdminReservationsPage() {
                 <td className="px-4 py-3 text-gray-300">{r.time}</td>
                 <td className="px-4 py-3 text-white font-medium">{r.partySize}</td>
                 <td className="px-4 py-3">
-                  <span className={`px-2 py-1 rounded text-xs font-medium ${statusStyles[r.status] || "bg-gray-500/20 text-gray-400"}`}>
-                    {r.status}
-                  </span>
+                  <ReservationStatusCell reservationId={r.id} initialStatus={r.status} />
                 </td>
               </tr>
             ))}

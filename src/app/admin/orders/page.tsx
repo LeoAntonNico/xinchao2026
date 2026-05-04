@@ -1,6 +1,6 @@
-
 import { prisma } from "@/lib/prisma";
 import { requireAdminAuth } from "@/lib/require-admin";
+import { OrderStatusCell } from "@/components/admin/OrderStatusCell";
 
 interface OrderWithItems {
   id: string;
@@ -25,15 +25,6 @@ export default async function AdminOrdersPage() {
     },
     take: 50,
   });
-
-  const statusStyles: Record<string, string> = {
-    PENDING: "bg-yellow-500/20 text-yellow-400",
-    PAID: "bg-green-500/20 text-green-400",
-    PREPARING: "bg-blue-500/20 text-blue-400",
-    READY: "bg-brand-gold/20 text-brand-gold",
-    COMPLETED: "bg-gray-500/20 text-gray-400",
-    CANCELLED: "bg-red-500/20 text-red-400",
-  };
 
   return (
     <div className="space-y-8">
@@ -71,9 +62,7 @@ export default async function AdminOrdersPage() {
                   €{(order.totalAmount / 100).toFixed(2).replace(".", ",")}
                 </td>
                 <td className="px-4 py-3">
-                  <span className={`px-2 py-1 rounded text-xs font-medium ${statusStyles[order.status] || "bg-gray-500/20 text-gray-400"}`}>
-                    {order.status}
-                  </span>
+                  <OrderStatusCell orderId={order.id} initialStatus={order.status} />
                 </td>
               </tr>
             ))}
