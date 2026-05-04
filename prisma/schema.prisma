@@ -44,10 +44,9 @@ model MenuItem {
   sortOrder   Int     @default(0)
 
   categoryId String
-  locationId String
   category   MenuCategory @relation(fields: [categoryId], references: [id])
-  location   Location     @relation(fields: [locationId], references: [id])
 
+  locations Location[]
   orderItems OrderItem[]
 }
 

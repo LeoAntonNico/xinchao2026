@@ -8,7 +8,6 @@ const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
-  // Clear existing data
   await prisma.orderItem.deleteMany();
   await prisma.order.deleteMany();
   await prisma.reservation.deleteMany();
@@ -73,23 +72,31 @@ async function main() {
     caphe: "https://images.unsplash.com/photo-1514432324607-a09d9b4aefda?w=400&h=300&fit=crop",
   };
 
-  await prisma.menuItem.createMany({
-    data: [
-      // Utrecht items
-      { name: "Phở Bò", description: "Traditional beef noodle soup with herbs", price: 1395, imageUrl: images.phobo, categoryId: getCatId("pho"), locationId: utrecht.id, sortOrder: 1 },
-      { name: "Phở Gà", description: "Chicken noodle soup with fresh herbs", price: 1295, imageUrl: images.phoga, categoryId: getCatId("pho"), locationId: utrecht.id, sortOrder: 2 },
-      { name: "Bún Chả", description: "Grilled pork with vermicelli noodles", price: 1495, imageUrl: images.buncha, categoryId: getCatId("bun"), locationId: utrecht.id, sortOrder: 1 },
-      { name: "Cơm Tấm", description: "Broken rice with grilled pork chop", price: 1345, imageUrl: images.comtam, categoryId: getCatId("com"), locationId: utrecht.id, sortOrder: 1 },
-      { name: "Gỏi Cuốn", description: "Fresh spring rolls with shrimp and herbs", price: 795, imageUrl: images.goicuon, categoryId: getCatId("goi"), locationId: utrecht.id, sortOrder: 1 },
-      { name: "Trà Đá", description: "Vietnamese iced tea", price: 295, imageUrl: images.tra, categoryId: getCatId("drinks"), locationId: utrecht.id, sortOrder: 1 },
-      { name: "Cà Phê Sữa Đá", description: "Vietnamese iced coffee", price: 395, imageUrl: images.caphe, categoryId: getCatId("drinks"), locationId: utrecht.id, sortOrder: 2 },
-      // Wageningen items
-      { name: "Phở Bò", description: "Traditional beef noodle soup with herbs", price: 1395, imageUrl: images.phobo, categoryId: getCatId("pho"), locationId: wageningen.id, sortOrder: 1 },
-      { name: "Bún Thịt Nướng", description: "Grilled pork with vermicelli and salad", price: 1445, imageUrl: images.bunthit, categoryId: getCatId("bun"), locationId: wageningen.id, sortOrder: 1 },
-      { name: "Cơm Gà", description: "Chicken rice with ginger sauce", price: 1295, imageUrl: images.comga, categoryId: getCatId("com"), locationId: wageningen.id, sortOrder: 1 },
-      { name: "Trà Đá", description: "Vietnamese iced tea", price: 295, imageUrl: images.tra, categoryId: getCatId("drinks"), locationId: wageningen.id, sortOrder: 1 },
-    ],
-  });
+  const itemsSeed = [
+    { name: "Phở Bò", description: "Traditional beef noodle soup with herbs", price: 1395, imageUrl: images.phobo, slug: "pho", sortOrder: 1, locs: [utrecht.id, wageningen.id] },
+    { name: "Phở Gà", description: "Chicken noodle soup with fresh herbs", price: 1295, imageUrl: images.phoga, slug: "pho", sortOrder: 2, locs: [utrecht.id] },
+    { name: "Bún Chả", description: "Grilled pork with vermicelli noodles", price: 1495, imageUrl: images.buncha, slug: "bun", sortOrder: 1, locs: [utrecht.id] },
+    { name: "Bún Thịt Nướng", description: "Grilled pork with vermicelli and salad", price: 1445, imageUrl: images.bunthit, slug: "bun", sortOrder: 2, locs: [wageningen.id] },
+    { name: "Cơm Tấm", description: "Broken rice with grilled pork chop", price: 1345, imageUrl: images.comtam, slug: "com", sortOrder: 1, locs: [utrecht.id] },
+    { name: "Cơm Gà", description: "Chicken rice with ginger sauce", price: 1295, imageUrl: images.comga, slug: "com", sortOrder: 2, locs: [wageningen.id] },
+    { name: "Gỏi Cuốn", description: "Fresh spring rolls with shrimp and herbs", price: 795, imageUrl: images.goicuon, slug: "goi", sortOrder: 1, locs: [utrecht.id] },
+    { name: "Trà Đá", description: "Vietnamese iced tea", price: 295, imageUrl: images.tra, slug: "drinks", sortOrder: 1, locs: [utrecht.id, wageningen.id] },
+    { name: "Cà Phê Sữa Đá", description: "Vietnamese iced coffee", price: 395, imageUrl: images.caphe, slug: "drinks", sortOrder: 2, locs: [utrecht.id] },
+  ];
+
+  for (const s of itemsSeed) {
+    await prisma.menuItem.create({
+      data: {
+        name: s.name,
+        description: s.description,
+        price: s.price,
+        imageUrl: s.imageUrl,
+        sortOrder: s.sortOrder,
+        categoryId: getCatId(s.slug),
+        locations: { connect: s.locs.map((id) => ({ id })) },
+      },
+    });
+  }
 
   console.log("Seeding pickup slots...");
   const today = new Date();

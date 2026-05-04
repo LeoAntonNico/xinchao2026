@@ -13,7 +13,7 @@ export async function GET(
   const { id } = await params;
   const item = await prisma.menuItem.findUnique({
     where: { id },
-    include: { category: true, location: true },
+    include: { category: true, locations: true },
   });
   if (!item) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json(item);
@@ -28,12 +28,24 @@ export async function PATCH(
 
   const { id } = await params;
   const body = await request.json();
-  const { name, description, price, imageUrl, isAvailable, categoryId, locationId, sortOrder } = body;
+  const { name, description, price, imageUrl, isAvailable, categoryId, locationIds, sortOrder } = body;
+
+  const data: Record<string, unknown> = {};
+  if (name !== undefined) data.name = name;
+  if (description !== undefined) data.description = description;
+  if (price !== undefined) data.price = price;
+  if (imageUrl !== undefined) data.imageUrl = imageUrl;
+  if (isAvailable !== undefined) data.isAvailable = isAvailable;
+  if (categoryId !== undefined) data.categoryId = categoryId;
+  if (sortOrder !== undefined) data.sortOrder = sortOrder;
+  if (locationIds !== undefined) {
+    data.locations = { set: locationIds.map((id: string) => ({ id })) };
+  }
 
   const item = await prisma.menuItem.update({
     where: { id },
-    data: { name, description, price, imageUrl, isAvailable, categoryId, locationId, sortOrder },
-    include: { category: true, location: true },
+    data,
+    include: { category: true, locations: true },
   });
   return NextResponse.json(item);
 }

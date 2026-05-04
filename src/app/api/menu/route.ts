@@ -13,7 +13,10 @@ export async function GET(req: Request) {
     orderBy: { sortOrder: "asc" },
     include: {
       items: {
-        where: { locationId, isAvailable: true },
+        where: {
+          locations: { some: { id: locationId } },
+          isAvailable: true,
+        },
         orderBy: { sortOrder: "asc" },
       },
     },

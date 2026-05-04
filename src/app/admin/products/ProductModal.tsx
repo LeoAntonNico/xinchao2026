@@ -13,9 +13,8 @@ interface MenuItem {
   isAvailable: boolean;
   sortOrder: number;
   categoryId: string;
-  locationId: string;
+  locations: Location[];
   category?: Category;
-  location?: Location;
 }
 
 interface ProductModalProps {
@@ -25,6 +24,7 @@ interface ProductModalProps {
   editingItem: MenuItem | null;
   categories: Category[];
   locations: Location[];
+  onCategoryCreated?: (cat: Category) => void;
 }
 
 function CheckCard({
@@ -60,27 +60,30 @@ function CheckCard({
   );
 }
 
-export function ProductModal({ isOpen, onClose, onSave, editingItem, categories, locations }: ProductModalProps) {
+export function ProductModal({ isOpen, onClose, onSave, editingItem, categories, locations, onCategoryCreated }: ProductModalProps) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [priceEur, setPriceEur] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [isAvailable, setIsAvailable] = useState(true);
   const [categoryId, setCategoryId] = useState("");
-  const [locationId, setLocationId] = useState("");
+  const [locationIds, setLocationIds] = useState<string[]>([]);
   const [sortOrder, setSortOrder] = useState("0");
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
+  const [showNewCat, setShowNewCat] = useState(false);
+  const [newCatName, setNewCatName] = useState("");
+  const [creatingCat, setCreatingCat] = useState(false);
 
   useEffect(() => {
     if (editingItem) {
       setName(editingItem.name);
       setDescription(editingItem.description || "");
-      setPriceEur((editingItem.price / 100).toFixed(2));
+      setPriceEur((editingItem.price / 100).toFixed(2).replace(".", ","));
       setImageUrl(editingItem.imageUrl || "");
       setIsAvailable(editingItem.isAvailable);
       setCategoryId(editingItem.categoryId);
-      setLocationId(editingItem.locationId);
+      setLocationIds(editingItem.locations?.map((l) => l.id) || []);
       setSortOrder(String(editingItem.sortOrder));
     } else {
       setName("");
@@ -89,21 +92,45 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
       setImageUrl("");
       setIsAvailable(true);
       setCategoryId(categories[0]?.id || "");
-      setLocationId(locations[0]?.id || "");
+      setLocationIds(locations[0] ? [locations[0].id] : []);
       setSortOrder("0");
     }
     setErrors([]);
     setSaving(false);
+    setShowNewCat(false);
+    setNewCatName("");
   }, [editingItem, isOpen, categories, locations]);
 
   const validate = useCallback(() => {
     const errs: string[] = [];
     if (!name.trim()) errs.push("Name is required");
-    if (!priceEur || isNaN(parseFloat(priceEur))) errs.push("Valid price is required");
+    if (!priceEur || isNaN(parseFloat(priceEur.replace(",", ".")))) errs.push("Valid price is required");
     if (!categoryId) errs.push("Category is required");
-    if (!locationId) errs.push("Location is required");
+    if (locationIds.length === 0) errs.push("At least one location is required");
     return errs;
-  }, [name, priceEur, categoryId, locationId]);
+  }, [name, priceEur, categoryId, locationIds]);
+
+  async function handleCreateCategory() {
+    if (!newCatName.trim()) return;
+    setCreatingCat(true);
+    try {
+      const res = await fetch("/api/admin/categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newCatName.trim(), sortOrder: categories.length + 1 }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      const cat = await res.json();
+      onCategoryCreated?.(cat);
+      setCategoryId(cat.id);
+      setShowNewCat(false);
+      setNewCatName("");
+    } catch {
+      setErrors(["Failed to create category"]);
+    } finally {
+      setCreatingCat(false);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -114,14 +141,15 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
     }
 
     setSaving(true);
+    const priceNum = Math.round(parseFloat(priceEur.replace(",", ".")) * 100);
     const payload = {
       name,
       description: description || null,
-      price: Math.round(parseFloat(priceEur) * 100),
+      price: priceNum,
       imageUrl: imageUrl || null,
       isAvailable,
       categoryId,
-      locationId,
+      locationIds,
       sortOrder: parseInt(sortOrder) || 0,
     };
 
@@ -154,7 +182,7 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
             {editingItem ? "Edit Product" : "Add Product"}
           </h2>
           <button onClick={onClose} className="text-gray-400 hover:text-white text-xl leading-none">
-            ×
+            &times;
           </button>
         </div>
 
@@ -189,14 +217,14 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-gray-400 mb-1">Price (€)</label>
+              <label className="block text-xs font-medium text-gray-400 mb-1">Price (&euro;)</label>
               <input
-                type="number"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
                 value={priceEur}
                 onChange={(e) => setPriceEur(e.target.value)}
                 className="w-full bg-background border border-border-default rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-500"
-                placeholder="14.95"
+                placeholder="14,95"
               />
             </div>
             <div>
@@ -224,9 +252,47 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
             )}
           </div>
 
-          {/* Category tick boxes */}
+          {/* Category row + add new */}
           <div>
-            <label className="block text-xs font-medium text-gray-400 mb-2">Category</label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-medium text-gray-400">Category</label>
+              {!showNewCat && (
+                <button
+                  type="button"
+                  onClick={() => setShowNewCat(true)}
+                  className="text-xs text-brand-gold hover:text-brand-gold/80 font-medium"
+                >
+                  + New Category
+                </button>
+              )}
+            </div>
+            {showNewCat && (
+              <div className="flex gap-2 mb-3">
+                <input
+                  type="text"
+                  value={newCatName}
+                  onChange={(e) => setNewCatName(e.target.value)}
+                  placeholder="Category name"
+                  className="flex-1 bg-background border border-border-default rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-500"
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleCreateCategory(); } }}
+                />
+                <button
+                  type="button"
+                  onClick={handleCreateCategory}
+                  disabled={creatingCat || !newCatName.trim()}
+                  className="px-3 py-2 bg-brand-red text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+                >
+                  {creatingCat ? "..." : "Create"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowNewCat(false); setNewCatName(""); }}
+                  className="px-3 py-2 text-gray-400 hover:text-white text-sm"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
             <div className="flex flex-wrap gap-2">
               {categories.map((c) => (
                 <CheckCard
@@ -239,16 +305,20 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
             </div>
           </div>
 
-          {/* Location tick boxes */}
+          {/* Location tick boxes - multi-select */}
           <div>
-            <label className="block text-xs font-medium text-gray-400 mb-2">Location</label>
+            <label className="block text-xs font-medium text-gray-400 mb-2">Locations</label>
             <div className="flex flex-wrap gap-2">
               {locations.map((l) => (
                 <CheckCard
                   key={l.id}
                   label={l.name}
-                  checked={locationId === l.id}
-                  onChange={() => setLocationId(l.id)}
+                  checked={locationIds.includes(l.id)}
+                  onChange={() =>
+                    setLocationIds((prev) =>
+                      prev.includes(l.id) ? prev.filter((id) => id !== l.id) : [...prev, l.id]
+                    )
+                  }
                 />
               ))}
             </div>

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Plus, Package, Pencil, Trash2 } from "lucide-react";
 import { ProductModal } from "./ProductModal";
 
 interface Category { id: string; name: string; }
@@ -15,9 +15,8 @@ interface MenuItem {
   isAvailable: boolean;
   sortOrder: number;
   categoryId: string;
-  locationId: string;
+  locations: Location[];
   category?: Category;
-  location?: Location;
 }
 
 export default function ProductsPage() {
@@ -29,161 +28,138 @@ export default function ProductsPage() {
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [itemsRes, catsRes, locsRes] = await Promise.all([
-        fetch("/api/admin/menu-items"),
-        fetch("/api/admin/categories"),
-        fetch("/api/admin/locations"),
-      ]);
-      const itemsData = await itemsRes.json();
-      const catsData = await catsRes.json();
-      const locsData = await locsRes.json();
-      setItems(itemsRes.ok ? itemsData : []);
-      setCategories(catsRes.ok ? catsData : []);
-      setLocations(locsRes.ok ? locsData : []);
-    } catch {
-      // silent
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    Promise.all([
+      fetch("/api/admin/menu-items").then((r) => r.json()),
+      fetch("/api/admin/categories").then((r) => r.json()),
+      fetch("/api/admin/locations").then((r) => r.json()),
+    ]).then(([itemsData, catsData, locsData]) => {
+      setItems(itemsData);
+      setCategories(catsData);
+      setLocations(locsData);
+      setLoading(false);
+    });
+  }, []);
 
   function handleEdit(item: MenuItem) {
     setEditingItem(item);
     setModalOpen(true);
   }
 
-  function handleCreate() {
+  function handleAdd() {
     setEditingItem(null);
     setModalOpen(true);
   }
 
   function handleSave(savedItem: MenuItem) {
     setItems((prev) => {
-      if (editingItem) {
+      const exists = prev.find((i) => i.id === savedItem.id);
+      if (exists) {
         return prev.map((i) => (i.id === savedItem.id ? savedItem : i));
       }
-      return [savedItem, ...prev];
+      return [...prev, savedItem];
     });
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Are you sure you want to delete this product?")) return;
+    if (!confirm("Delete this product?")) return;
     setDeletingId(id);
     try {
       const res = await fetch(`/api/admin/menu-items/${id}`, { method: "DELETE" });
-      if (res.ok) {
-        setItems((prev) => prev.filter((i) => i.id !== id));
-      }
+      if (res.ok) setItems((prev) => prev.filter((i) => i.id !== id));
     } finally {
       setDeletingId(null);
     }
   }
 
-  function getCategoryName(id: string) {
-    return categories.find((c) => c.id === id)?.name || "—";
+  function handleCategoryCreated(cat: Category) {
+    setCategories((prev) => [...prev, cat]);
   }
 
-  function getLocationName(id: string) {
-    return locations.find((l) => l.id === id)?.name || "—";
-  }
+  const formatPrice = (cents: number) =>
+    `€ ${(cents / 100).toFixed(2).replace(".", ",")}`;
 
-  if (loading) {
-    return (
-      <div className="space-y-8">
-        <h1 className="text-3xl font-bold text-white">Products</h1>
-        <p className="text-gray-400">Loading...</p>
-      </div>
-    );
-  }
+  if (loading) return <div className="text-gray-400 p-6">Loading...</div>;
 
   return (
-    <div className="space-y-8">
+    <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-white">Products</h1>
+        <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+          <Package className="w-6 h-6 text-brand-gold" />
+          Products
+        </h1>
         <button
-          onClick={handleCreate}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-red hover:bg-red-700 text-white text-sm font-medium transition-colors"
+          onClick={handleAdd}
+          className="px-4 py-2 bg-brand-red hover:bg-red-700 text-white rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
         >
-          <Plus className="w-4 h-4" />
-          Add Product
+          <Plus className="w-4 h-4" /> Add Product
         </button>
       </div>
 
       <div className="bg-sidebar border border-border-default rounded-xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm min-w-[800px]">
-            <thead className="bg-gray-800 text-gray-400">
-              <tr>
-                <th className="px-4 py-3 font-medium w-14">Image</th>
-                <th className="px-4 py-3 font-medium">Name</th>
-                <th className="px-4 py-3 font-medium">Category</th>
-                <th className="px-4 py-3 font-medium">Location</th>
-                <th className="px-4 py-3 font-medium">Price</th>
-                <th className="px-4 py-3 font-medium">Available</th>
-                <th className="px-4 py-3 font-medium w-24">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border-default">
-              {items.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-gray-400">
-                    No products yet. Click "Add Product" to get started.
-                  </td>
-                </tr>
-              ) : (
-                items.map((item) => (
-                  <tr key={item.id} className="hover:bg-gray-700/30">
-                    <td className="px-4 py-2">
-                      <img
-                        src={item.imageUrl || "https://via.placeholder.com/40?text=?"}
-                        alt={item.name}
-                        className="w-10 h-10 object-cover rounded-lg"
-                      />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="text-white font-medium">{item.name}</div>
-                      {item.description && <div className="text-gray-500 text-xs">{item.description}</div>}
-                    </td>
-                    <td className="px-4 py-3 text-gray-300">{getCategoryName(item.categoryId)}</td>
-                    <td className="px-4 py-3 text-gray-300">{getLocationName(item.locationId)}</td>
-                    <td className="px-4 py-3 text-white font-medium">€{(item.price / 100).toFixed(2).replace(".", ",")}</td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${item.isAvailable ? "bg-green-500/20 text-green-400" : "bg-gray-500/20 text-gray-400"}`}>
-                        {item.isAvailable ? "Yes" : "No"}
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border-default text-gray-400 text-left">
+              <th className="px-4 py-3 font-medium">Image</th>
+              <th className="px-4 py-3 font-medium">Name</th>
+              <th className="px-4 py-3 font-medium">Category</th>
+              <th className="px-4 py-3 font-medium">Price</th>
+              <th className="px-4 py-3 font-medium">Locations</th>
+              <th className="px-4 py-3 font-medium">Available</th>
+              <th className="px-4 py-3 font-medium text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item) => (
+              <tr key={item.id} className="border-b border-border-default last:border-0 hover:bg-white/5">
+                <td className="px-4 py-3">
+                  {item.imageUrl ? (
+                    <img src={item.imageUrl} alt={item.name} className="w-12 h-12 object-cover rounded-lg border border-border-default" />
+                  ) : (
+                    <div className="w-12 h-12 bg-background rounded-lg border border-border-default" />
+                  )}
+                </td>
+                <td className="px-4 py-3 text-white font-medium">{item.name}</td>
+                <td className="px-4 py-3 text-gray-300">{item.category?.name || "-"}</td>
+                <td className="px-4 py-3 text-gray-300">{formatPrice(item.price)}</td>
+                <td className="px-4 py-3">
+                  <div className="flex flex-wrap gap-1">
+                    {item.locations?.map((loc) => (
+                      <span key={loc.id} className="px-2 py-0.5 rounded bg-brand-gold/10 text-brand-gold text-xs border border-brand-gold/20">
+                        {loc.name}
                       </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => handleEdit(item)}
-                          className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
-                          title="Edit"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(item.id)}
-                          disabled={deletingId === item.id}
-                          className="p-1.5 rounded-lg text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                    )) || <span className="text-gray-500 text-xs">-</span>}
+                  </div>
+                </td>
+                <td className="px-4 py-3">
+                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${item.isAvailable ? "bg-green-500/15 text-green-400 border border-green-500/20" : "bg-gray-700 text-gray-400 border border-gray-600"}`}>
+                    {item.isAvailable ? "Yes" : "No"}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <div className="flex items-center justify-end gap-2">
+                    <button
+                      onClick={() => handleEdit(item)}
+                      className="p-1.5 text-gray-400 hover:text-brand-gold transition-colors"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(item.id)}
+                      disabled={deletingId === item.id}
+                      className="p-1.5 text-gray-400 hover:text-red-400 transition-colors disabled:opacity-50"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {items.length === 0 && (
+          <div className="p-8 text-center text-gray-500 text-sm">No products yet.</div>
+        )}
       </div>
 
       <ProductModal
@@ -193,6 +169,7 @@ export default function ProductsPage() {
         editingItem={editingItem}
         categories={categories}
         locations={locations}
+        onCategoryCreated={handleCategoryCreated}
       />
     </div>
   );
