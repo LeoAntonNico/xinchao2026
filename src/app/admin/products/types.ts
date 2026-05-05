@@ -1,0 +1,23 @@
+export interface Category { id: string; name: string; }
+export interface Location { id: string; name: string; }
+export interface Variant { id: string; name: string; price: number; sortOrder: number; }
+export interface Modifier { id: string; name: string; price: number; sortOrder: number; }
+export interface MenuItem {
+  id: string;
+  name: string;
+  description: string | null;
+  shortDescription: string | null;
+  price: number;
+  salePrice: number | null;
+  taxClass: string;
+  imageUrl: string | null;
+  imageUrls: string[];
+  isAvailable: boolean;
+  sortOrder: number;
+  locations: Location[];
+  categories: Category[];
+  dietaryTags: string[];
+  isSpicy: boolean;
+  variants: Variant[];
+  modifiers: Modifier[];
+}

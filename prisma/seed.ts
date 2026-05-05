@@ -8,6 +8,8 @@ const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
+  await prisma.productModifier.deleteMany();
+  await prisma.productVariant.deleteMany();
   await prisma.orderItem.deleteMany();
   await prisma.order.deleteMany();
   await prisma.reservation.deleteMany();

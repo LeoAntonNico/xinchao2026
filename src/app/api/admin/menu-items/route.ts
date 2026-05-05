@@ -8,7 +8,7 @@ export async function GET() {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const items = await prisma.menuItem.findMany({
-    include: { categories: true, locations: true },
+    include: { categories: true, locations: true, variants: true, modifiers: true },
     orderBy: { sortOrder: "asc" },
   });
   return NextResponse.json(items);
@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await request.json();
-  const { name, description, price, imageUrl, isAvailable, categoryIds, locationIds, sortOrder } = body;
+  const { name, description, shortDescription, price, salePrice, taxClass, imageUrl, imageUrls, isAvailable, categoryIds, locationIds, sortOrder, dietaryTags, isSpicy } = body;
 
   if (!name || !price || !categoryIds || categoryIds.length === 0 || !locationIds || locationIds.length === 0) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -29,14 +29,20 @@ export async function POST(request: NextRequest) {
     data: {
       name,
       description: description || null,
+      shortDescription: shortDescription || null,
       price,
-      imageUrl,
+      salePrice: salePrice || null,
+      taxClass: taxClass || "standard",
+      imageUrl: imageUrl || null,
+      imageUrls: imageUrls || [],
       isAvailable,
-      sortOrder,
+      sortOrder: sortOrder || 0,
+      dietaryTags: dietaryTags || [],
+      isSpicy: isSpicy || false,
       categories: { connect: categoryIds.map((id: string) => ({ id })) },
       locations: { connect: locationIds.map((id: string) => ({ id })) },
     },
-    include: { categories: true, locations: true },
+    include: { categories: true, locations: true, variants: true, modifiers: true },
   });
   return NextResponse.json(item);
 }

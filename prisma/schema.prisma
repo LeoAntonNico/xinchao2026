@@ -35,21 +35,46 @@ model MenuCategory {
 }
 
 model MenuItem {
-  id          String  @id @default(uuid())
-  name        String
-  description String?
-  price       Int // cents (EUR)
-  imageUrl    String?
-  isAvailable Boolean @default(true)
-  sortOrder   Int     @default(0)
+  id               String  @id @default(uuid())
+  name             String
+  description      String? // long description
+  shortDescription String? // short excerpt
+  price            Int // cents (EUR) — base price
+  salePrice        Int? // cents — strike-through promotional price
+  taxClass         String  @default("standard") // standard, reduced, zero, alcohol
+  imageUrl         String? // legacy primary image
+  imageUrls        String[] @default([]) // photo gallery
+  isAvailable      Boolean @default(true)
+  sortOrder        Int     @default(0)
 
-  dietaryTags String[] @default([]) // vegan, gluten-free, dairy-free, nut-free
-  isSpicy     Boolean @default(false)
+  dietaryTags String[] @default([])
+  isSpicy     Boolean  @default(false)
 
   categories MenuCategory[]
-
-  locations Location[]
+  locations  Location[]
   orderItems OrderItem[]
+  variants   ProductVariant[]
+  modifiers  ProductModifier[]
+}
+
+model ProductVariant {
+  id        String @id @default(uuid())
+  name      String
+  price     Int // cents — override price for this variant (0 = same as base)
+  sortOrder Int    @default(0)
+
+  menuItemId String
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+}
+
+model ProductModifier {
+  id        String @id @default(uuid())
+  name      String
+  price     Int    @default(0) // cents — added to order total
+  sortOrder Int    @default(0)
+
+  menuItemId String
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
 }
 
 model PickupSlot {
