@@ -338,19 +338,42 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
 
           {/* CONTENT */}
           <Section title="Content">
+            <div className="flex gap-1 mb-4 bg-white/5 rounded-lg p-1 w-fit">
+              <button type="button" onClick={() => setLangTab("en")} className={`px-3 py-1 rounded text-xs font-medium transition-colors ${langTab === "en" ? "bg-brand-red text-white" : "text-gray-400 hover:text-white"}`}>English</button>
+              <button type="button" onClick={() => setLangTab("nl")} className={`px-3 py-1 rounded text-xs font-medium transition-colors ${langTab === "nl" ? "bg-brand-red text-white" : "text-gray-400 hover:text-white"}`}>Nederlands</button>
+            </div>
             <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-400 mb-1">Product Name</label>
-                <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-background border border-border-default rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-500" placeholder="B&#xFA;n Ch&#x1EA3;" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-400 mb-1">Short Description <span className="text-gray-500">(appears next to image on front-end)</span></label>
-                <input type="text" value={shortDescription} onChange={(e) => setShortDescription(e.target.value)} className="w-full bg-background border border-border-default rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-500" placeholder="Grilled pork with vermicelli noodles &#x2013; a Hanoi classic" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-400 mb-1">Long Description <span className="text-gray-500">(detail page / tabs below)</span></label>
-                <textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} className="w-full bg-background border border-border-default rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-500 resize-none" placeholder="Full product description..." />
-              </div>
+              {langTab === "en" ? (
+                <>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-400 mb-1">Product Name</label>
+                    <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-background border border-border-default rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-500" placeholder="Bún Chả" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-400 mb-1">Short Description <span className="text-gray-500">(appears next to image on front-end)</span></label>
+                    <input type="text" value={shortDescription} onChange={(e) => setShortDescription(e.target.value)} className="w-full bg-background border border-border-default rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-500" placeholder="Grilled pork with vermicelli noodles – a Hanoi classic" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-400 mb-1">Long Description <span className="text-gray-500">(detail page / tabs below)</span></label>
+                    <textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} className="w-full bg-background border border-border-default rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-500 resize-none" placeholder="Full product description..." />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-400 mb-1">Productnaam</label>
+                    <input type="text" value={nameNl} onChange={(e) => setNameNl(e.target.value)} className="w-full bg-background border border-border-default rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-500" placeholder="Bún Chả" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-400 mb-1">Korte beschrijving <span className="text-gray-500">(naast afbeelding op de site)</span></label>
+                    <input type="text" value={shortDescriptionNl} onChange={(e) => setShortDescriptionNl(e.target.value)} className="w-full bg-background border border-border-default rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-500" placeholder="Gegrild varkensvlees met rijstvermicelli" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-400 mb-1">Lange beschrijving <span className="text-gray-500">(detailpagina)</span></label>
+                    <textarea rows={3} value={descriptionNl} onChange={(e) => setDescriptionNl(e.target.value)} className="w-full bg-background border border-border-default rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-500 resize-none" placeholder="Volledige productbeschrijving..." />
+                  </div>
+                </>
+              )}
 
               {/* Gallery */}
               <div>
