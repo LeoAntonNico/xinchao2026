@@ -30,9 +30,9 @@ export default function ProductsPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch("/api/admin/menu-items").then(async (r) => (r.ok ? r.json() : [])),
-      fetch("/api/admin/categories").then(async (r) => (r.ok ? r.json() : [])),
-      fetch("/api/admin/locations").then(async (r) => (r.ok ? r.json() : [])),
+      fetch("/api/admin/menu-items", { credentials: "include" }).then(async (r) => (r.ok ? r.json() : [])),
+      fetch("/api/admin/categories", { credentials: "include" }).then(async (r) => (r.ok ? r.json() : [])),
+      fetch("/api/admin/locations", { credentials: "include" }).then(async (r) => (r.ok ? r.json() : [])),
     ]).then(([itemsData, catsData, locsData]) => {
       setItems(Array.isArray(itemsData) ? itemsData : []);
       setCategories(Array.isArray(catsData) ? catsData : []);

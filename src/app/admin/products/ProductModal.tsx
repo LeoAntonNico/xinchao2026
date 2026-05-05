@@ -117,16 +117,21 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
       const res = await fetch("/api/admin/categories", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ name: newCatName.trim(), sortOrder: categories.length + 1 }),
       });
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        setErrors([err.error || `Failed (${res.status})`]);
+        return;
+      }
       const cat = await res.json();
       onCategoryCreated?.(cat);
       setCategoryId(cat.id);
       setShowNewCat(false);
       setNewCatName("");
     } catch {
-      setErrors(["Failed to create category"]);
+      setErrors(["Network error. Please try again."]);
     } finally {
       setCreatingCat(false);
     }
@@ -159,6 +164,7 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error("Save failed");
