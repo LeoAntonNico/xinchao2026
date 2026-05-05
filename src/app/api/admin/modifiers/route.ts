@@ -8,11 +8,11 @@ export async function POST(request: NextRequest) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await request.json();
-  const { name, price, menuItemId, sortOrder } = body;
+  const { name, nameNl, price, menuItemId, sortOrder } = body;
   if (!name || !menuItemId) return NextResponse.json({ error: "Missing fields" }, { status: 400 });
 
   const mod = await prisma.productModifier.create({
-    data: { name, price: price ?? 0, menuItemId, sortOrder: sortOrder ?? 0 },
+    data: { name, nameNl: nameNl ?? null, price: price ?? 0, menuItemId, sortOrder: sortOrder ?? 0 },
   });
   return NextResponse.json(mod);
 }

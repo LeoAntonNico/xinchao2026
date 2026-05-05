@@ -9,10 +9,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   const { id } = await params;
   const body = await request.json();
-  const { name, price, sortOrder } = body;
+  const { name, nameNl, price, sortOrder } = body;
 
   const data: Record<string, unknown> = {};
   if (name !== undefined) data.name = name;
+  if (nameNl !== undefined) data.nameNl = nameNl;
   if (price !== undefined) data.price = price;
   if (sortOrder !== undefined) data.sortOrder = sortOrder;
 

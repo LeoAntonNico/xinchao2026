@@ -94,8 +94,10 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
   const [variants, setVariants] = useState<Variant[]>([]);
   const [modifiers, setModifiers] = useState<Modifier[]>([]);
   const [newVariantName, setNewVariantName] = useState("");
+  const [newVariantNameNl, setNewVariantNameNl] = useState("");
   const [newVariantPrice, setNewVariantPrice] = useState("");
   const [newModifierName, setNewModifierName] = useState("");
+  const [newModifierNameNl, setNewModifierNameNl] = useState("");
   const [newModifierPrice, setNewModifierPrice] = useState("");
 
   // State
@@ -110,8 +112,11 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
   useEffect(() => {
     if (editingItem) {
       setName(editingItem.name);
+      setNameNl(editingItem.nameNl || "");
       setShortDescription(editingItem.shortDescription || "");
+      setShortDescriptionNl(editingItem.shortDescriptionNl || "");
       setDescription(editingItem.description || "");
+      setDescriptionNl(editingItem.descriptionNl || "");
       setPriceEur(centsToInput(editingItem.price));
       setSalePriceEur(centsToInput(editingItem.salePrice));
       setTaxClass(editingItem.taxClass || "standard");
@@ -126,7 +131,7 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
       setVariants(editingItem.variants || []);
       setModifiers(editingItem.modifiers || []);
     } else {
-      setName(""); setShortDescription(""); setDescription("");
+      setName(""); setNameNl(""); setShortDescription(""); setShortDescriptionNl(""); setDescription(""); setDescriptionNl("");
       setPriceEur(""); setSalePriceEur(""); setTaxClass("standard");
       setImageUrl(""); setImageUrls([]); setIsAvailable(true);
       setSortOrder("0"); setDietaryTags([]); setIsSpicy(false);
@@ -135,7 +140,8 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
       setLocationIds(locations[0] ? [locations[0].id] : []);
     }
     setErrors([]); setSaving(false); setShowNewCat(false); setNewCatName("");
-    setNewVariantName(""); setNewVariantPrice(""); setNewModifierName(""); setNewModifierPrice("");
+    setNewVariantName(""); setNewVariantNameNl(""); setNewVariantPrice("");
+    setNewModifierName(""); setNewModifierNameNl(""); setNewModifierPrice("");
   }, [editingItem, isOpen, categories, locations]);
 
   const validate = useCallback(() => {
@@ -144,8 +150,13 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
     if (!priceEur || isNaN(parseFloat(priceEur.replace(",", ".")))) errs.push("Valid base price required");
     if (categoryIds.length === 0) errs.push("At least one category");
     if (locationIds.length === 0) errs.push("At least one location");
+    // Validate variant names for selected language
+    const vNameEmpty = variants.some((v) => langTab === "en" ? !v.name.trim() : !v.nameNl?.trim() && !v.name.trim());
+    if (vNameEmpty) errs.push(`All variants need a ${langTab === "en" ? "name" : "Dutch name"}`);
+    const mNameEmpty = modifiers.some((m) => langTab === "nl" ? !m.nameNl?.trim() && !m.name.trim() : false);
+    if (mNameEmpty) errs.push("All modifiers need a Dutch name");
     return errs;
-  }, [name, priceEur, categoryIds, locationIds]);
+  }, [name, priceEur, categoryIds, locationIds, variants, modifiers, langTab]);
 
   async function handleCreateCategory() {
     if (!newCatName.trim()) return;
@@ -246,70 +257,123 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
   }
 
   async function syncVariantsAndModifiers(itemId: string): Promise<MenuItem> {
-    // variants: if ID exists, keep; if no ID but name exists, create; if ID in editing but not in state, delete
     const edits: MenuItem | null = editingItem ? editingItem : null;
     const existingV = edits?.variants || [];
     const toDeleteV = existingV.filter((ev) => !variants.find((v) => v.id === ev.id)).map((v) => v.id);
-    const toCreateV = variants.filter((v) => !v.id).map((v) => ({ name: v.name, price: v.price, menuItemId: itemId, sortOrder: v.sortOrder }));
+    const toCreateV = variants.filter((v) => !v.id).map((v) => ({ name: v.name, nameNl: v.nameNl ?? null, price: v.price, menuItemId: itemId, sortOrder: v.sortOrder }));
 
     for (const id of toDeleteV) await fetch(`/api/admin/variants/${id}`, { method: "DELETE", credentials: "include" });
     for (const v of toCreateV) await fetch("/api/admin/variants", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify(v) });
-    // update existing
     for (const v of variants.filter((v) => v.id)) {
       const orig = existingV.find((ev) => ev.id === v.id);
-      if (orig && (orig.name !== v.name || orig.price !== v.price)) {
-        await fetch(`/api/admin/variants/${v.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ name: v.name, price: v.price }) });
+      if (orig && (orig.name !== v.name || orig.nameNl !== v.nameNl || orig.price !== v.price)) {
+        await fetch(`/api/admin/variants/${v.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ name: v.name, nameNl: v.nameNl ?? null, price: v.price }) });
       }
     }
 
-    // modifiers
     const existingM = edits?.modifiers || [];
     const toDeleteM = existingM.filter((em) => !modifiers.find((m) => m.id === em.id)).map((m) => m.id);
-    const toCreateM = modifiers.filter((m) => !m.id).map((m) => ({ name: m.name, price: m.price, menuItemId: itemId, sortOrder: m.sortOrder }));
+    const toCreateM = modifiers.filter((m) => !m.id).map((m) => ({ name: m.name, nameNl: m.nameNl ?? null, price: m.price, menuItemId: itemId, sortOrder: m.sortOrder }));
 
     for (const id of toDeleteM) await fetch(`/api/admin/modifiers/${id}`, { method: "DELETE", credentials: "include" });
     for (const m of toCreateM) await fetch("/api/admin/modifiers", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify(m) });
     for (const m of modifiers.filter((m) => m.id)) {
       const orig = existingM.find((em) => em.id === m.id);
-      if (orig && (orig.name !== m.name || orig.price !== m.price)) {
-        await fetch(`/api/admin/modifiers/${m.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ name: m.name, price: m.price }) });
+      if (orig && (orig.name !== m.name || orig.nameNl !== m.nameNl || orig.price !== m.price)) {
+        await fetch(`/api/admin/modifiers/${m.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ name: m.name, nameNl: m.nameNl ?? null, price: m.price }) });
       }
     }
 
-    // return refreshed item
     const res = await fetch(`/api/admin/menu-items/${itemId}`, { credentials: "include" });
     if (res.ok) return await res.json();
-    return { id: itemId, name, description, shortDescription, price: inputToCents(priceEur)!, salePrice: inputToCents(salePriceEur), taxClass, imageUrl, imageUrls, isAvailable, sortOrder: parseInt(sortOrder) || 0, dietaryTags, isSpicy, categories: categories.filter((c) => categoryIds.includes(c.id)), locations: locations.filter((l) => locationIds.includes(l.id)), variants, modifiers } as MenuItem;
+    return { id: itemId, name, nameNl: nameNl || null, description, descriptionNl: descriptionNl || null, shortDescription, shortDescriptionNl: shortDescriptionNl || null, price: inputToCents(priceEur)!, salePrice: inputToCents(salePriceEur), taxClass, imageUrl, imageUrls, isAvailable, sortOrder: parseInt(sortOrder) || 0, dietaryTags, isSpicy, categories: categories.filter((c) => categoryIds.includes(c.id)), locations: locations.filter((l) => locationIds.includes(l.id)), variants, modifiers } as MenuItem;
   }
 
   function addVariant() {
     if (!newVariantName.trim()) return;
-    setVariants((prev) => [...prev, { id: "", name: newVariantName.trim(), price: inputToCents(newVariantPrice) || 0, sortOrder: prev.length }]);
-    setNewVariantName(""); setNewVariantPrice("");
+    setVariants((prev) => [...prev, { id: "", name: newVariantName.trim(), nameNl: newVariantNameNl.trim() || null, price: inputToCents(newVariantPrice) || 0, sortOrder: prev.length }]);
+    setNewVariantName(""); setNewVariantNameNl(""); setNewVariantPrice("");
   }
   function removeVariant(idx: number) { setVariants((prev) => prev.filter((_, i) => i !== idx)); }
 
   function addModifier() {
     if (!newModifierName.trim()) return;
-    setModifiers((prev) => [...prev, { id: "", name: newModifierName.trim(), price: inputToCents(newModifierPrice) || 0, sortOrder: prev.length }]);
-    setNewModifierName(""); setNewModifierPrice("");
+    setModifiers((prev) => [...prev, { id: "", name: newModifierName.trim(), nameNl: newModifierNameNl.trim() || null, price: inputToCents(newModifierPrice) || 0, sortOrder: prev.length }]);
+    setNewModifierName(""); setNewModifierNameNl(""); setNewModifierPrice("");
   }
   function removeModifier(idx: number) { setModifiers((prev) => prev.filter((_, i) => i !== idx)); }
+
+  // Helper to compute display name for variant/modifier given current language tab
+  function displayName(item: { name: string; nameNl: string | null }) {
+    if (langTab === "nl" && item.nameNl) return item.nameNl;
+    return item.name;
+  }
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-start justify-center z-50 pt-12 overflow-y-auto pb-10">
       <div className="bg-sidebar border border-border-default rounded-xl w-full max-w-3xl mx-4 shadow-2xl mb-20">
-        <div className="px-6 py-4 border-b border-border-default flex items-center justify-between sticky top-0 bg-sidebar z-10 rounded-t-xl">
+        <div className="px-6 py-4 border-b border-border-default flex items-center justify-between sticky top-0 bg-sidebar z-20 rounded-t-xl">
           <h2 className="text-lg font-bold text-white">{editingItem ? "Edit Product" : "Add Product"}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-white text-xl leading-none">&times;</button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {/* Language Toggle */}
+          <div className="flex items-center justify-between">
+            <div className="flex gap-1 bg-white/5 rounded-lg p-1 w-fit">
+              <button type="button" onClick={() => setLangTab("en")} className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${langTab === "en" ? "bg-brand-red text-white" : "text-gray-400 hover:text-white"}`}>English</button>
+              <button type="button" onClick={() => setLangTab("nl")} className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${langTab === "nl" ? "bg-brand-red text-white" : "text-gray-400 hover:text-white"}`}>Nederlands</button>
+            </div>
+            {editingItem && (
+              <span className="text-xs text-gray-500">
+                {nameNl || shortDescriptionNl || descriptionNl || variants.some(v => v.nameNl) || modifiers.some(m => m.nameNl) ? "Has Dutch content" : "No Dutch content yet"}
+              </span>
+            )}
+          </div>
+
           {errors.length > 0 && (
             <div className="bg-red-500/15 border border-red-500/30 text-red-400 rounded-lg px-4 py-3 text-sm">{errors.join(", ")}</div>
           )}
+
+          {/* CONTENT */}
+          <Section title="Content">
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-400 mb-1">{langTab === "en" ? "Product Name" : "Productnaam"} <span className="text-red-400">*</span></label>
+                <input type="text" value={langTab === "en" ? name : nameNl} onChange={(e) => langTab === "en" ? setName(e.target.value) : setNameNl(e.target.value)} className="w-full bg-background border border-border-default rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-500" placeholder={langTab === "en" ? "Bún Chả" : "Bún Chả"} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-400 mb-1">{langTab === "en" ? "Short Description" : "Korte beschrijving"} <span className="text-gray-500">{langTab === "en" ? "(appears next to image on front-end)" : "(naast afbeelding op de site)"}</span></label>
+                <input type="text" value={langTab === "en" ? shortDescription : shortDescriptionNl} onChange={(e) => langTab === "en" ? setShortDescription(e.target.value) : setShortDescriptionNl(e.target.value)} className="w-full bg-background border border-border-default rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-500" placeholder={langTab === "en" ? "Grilled pork with vermicelli noodles – a Hanoi classic" : "Gegrild varkensvlees met rijstvermicelli"} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-400 mb-1">{langTab === "en" ? "Long Description" : "Lange beschrijving"} <span className="text-gray-500">{langTab === "en" ? "(detail page / tabs below)" : "(detailpagina)"}</span></label>
+                <textarea rows={3} value={langTab === "en" ? description : descriptionNl} onChange={(e) => langTab === "en" ? setDescription(e.target.value) : setDescriptionNl(e.target.value)} className="w-full bg-background border border-border-default rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-500 resize-none" placeholder={langTab === "en" ? "Full product description..." : "Volledige productbeschrijving..."} />
+              </div>
+
+              {/* Gallery */}
+              <div>
+                <label className="block text-xs font-medium text-gray-400 mb-2">Product Gallery</label>
+                <div className="flex flex-wrap gap-3">
+                  {imageUrls.map((url, idx) => (
+                    <div key={idx} className="relative group">
+                      <img src={url} alt={`img-${idx}`} className={`w-20 h-20 object-cover rounded-lg border-2 cursor-pointer ${imageUrl === url ? "border-brand-gold" : "border-border-default"}`} onClick={() => setPrimary(url)} />
+                      <button type="button" onClick={() => removeImage(idx)} className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><X className="w-3 h-3 text-white" /></button>
+                      {imageUrl === url && <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 text-[9px] font-bold text-brand-gold bg-black/80 px-1 rounded">Primary</span>}
+                    </div>
+                  ))}
+                  <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading} className="w-20 h-20 rounded-lg border-2 border-dashed border-gray-600 flex flex-col items-center justify-center text-gray-400 hover:border-gray-400 hover:text-gray-300 transition-colors">
+                    <Upload className="w-5 h-5 mb-1" />
+                    <span className="text-[10px]">{uploading ? "..." : "Upload"}</span>
+                  </button>
+                  <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
+                </div>
+                <p className="text-[11px] text-gray-500 mt-2">Click an image to set as primary. Click &#x2715; to remove. Supported: JPG, PNG, WEBP.</p>
+              </div>
+            </div>
+          </Section>
 
           {/* PRICING */}
           <Section title="Pricing">
@@ -336,80 +400,27 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
             </div>
           </Section>
 
-          {/* CONTENT */}
-          <Section title="Content">
-            <div className="flex gap-1 mb-4 bg-white/5 rounded-lg p-1 w-fit">
-              <button type="button" onClick={() => setLangTab("en")} className={`px-3 py-1 rounded text-xs font-medium transition-colors ${langTab === "en" ? "bg-brand-red text-white" : "text-gray-400 hover:text-white"}`}>English</button>
-              <button type="button" onClick={() => setLangTab("nl")} className={`px-3 py-1 rounded text-xs font-medium transition-colors ${langTab === "nl" ? "bg-brand-red text-white" : "text-gray-400 hover:text-white"}`}>Nederlands</button>
-            </div>
-            <div className="space-y-4">
-              {langTab === "en" ? (
-                <>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-400 mb-1">Product Name</label>
-                    <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-background border border-border-default rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-500" placeholder="Bún Chả" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-400 mb-1">Short Description <span className="text-gray-500">(appears next to image on front-end)</span></label>
-                    <input type="text" value={shortDescription} onChange={(e) => setShortDescription(e.target.value)} className="w-full bg-background border border-border-default rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-500" placeholder="Grilled pork with vermicelli noodles – a Hanoi classic" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-400 mb-1">Long Description <span className="text-gray-500">(detail page / tabs below)</span></label>
-                    <textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} className="w-full bg-background border border-border-default rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-500 resize-none" placeholder="Full product description..." />
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-400 mb-1">Productnaam</label>
-                    <input type="text" value={nameNl} onChange={(e) => setNameNl(e.target.value)} className="w-full bg-background border border-border-default rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-500" placeholder="Bún Chả" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-400 mb-1">Korte beschrijving <span className="text-gray-500">(naast afbeelding op de site)</span></label>
-                    <input type="text" value={shortDescriptionNl} onChange={(e) => setShortDescriptionNl(e.target.value)} className="w-full bg-background border border-border-default rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-500" placeholder="Gegrild varkensvlees met rijstvermicelli" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-400 mb-1">Lange beschrijving <span className="text-gray-500">(detailpagina)</span></label>
-                    <textarea rows={3} value={descriptionNl} onChange={(e) => setDescriptionNl(e.target.value)} className="w-full bg-background border border-border-default rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-500 resize-none" placeholder="Volledige productbeschrijving..." />
-                  </div>
-                </>
-              )}
-
-              {/* Gallery */}
-              <div>
-                <label className="block text-xs font-medium text-gray-400 mb-2">Product Gallery</label>
-                <div className="flex flex-wrap gap-3">
-                  {imageUrls.map((url, idx) => (
-                    <div key={idx} className="relative group">
-                      <img src={url} alt={`img-${idx}`} className={`w-20 h-20 object-cover rounded-lg border-2 cursor-pointer ${imageUrl === url ? "border-brand-gold" : "border-border-default"}`} onClick={() => setPrimary(url)} />
-                      <button type="button" onClick={() => removeImage(idx)} className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><X className="w-3 h-3 text-white" /></button>
-                      {imageUrl === url && <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 text-[9px] font-bold text-brand-gold bg-black/80 px-1 rounded">Primary</span>}
-                    </div>
-                  ))}
-                  <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading} className="w-20 h-20 rounded-lg border-2 border-dashed border-gray-600 flex flex-col items-center justify-center text-gray-400 hover:border-gray-400 hover:text-gray-300 transition-colors">
-                    <Upload className="w-5 h-5 mb-1" />
-                    <span className="text-[10px]">{uploading ? "..." : "Upload"}</span>
-                  </button>
-                  <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
-                </div>
-                <p className="text-[11px] text-gray-500 mt-2">Click an image to set as primary. Click &#x2715; to remove. Supported: JPG, PNG, WEBP.</p>
-              </div>
-            </div>
-          </Section>
-
           {/* VARIANTS */}
           <Section title="Variations (Size / Portion Options)">
             <div className="space-y-2">
               {variants.map((v, i) => (
                 <div key={i} className="flex items-center gap-2 bg-background border border-border-default rounded-lg px-3 py-2">
-                  <span className="text-sm text-white flex-1">{v.name}</span>
+                  <span className="text-sm text-white flex-1">{displayName(v)}</span>
                   <span className="text-sm text-gray-400">{v.price ? `&#x20AC; ${(v.price / 100).toFixed(2).replace(".", ",")}` : "Same as base"}</span>
                   <button type="button" onClick={() => removeVariant(i)} className="p-1 text-gray-500 hover:text-red-400"><Trash2 className="w-3.5 h-3.5" /></button>
                 </div>
               ))}
-              <div className="flex gap-2">
-                <input type="text" value={newVariantName} onChange={(e) => setNewVariantName(e.target.value)} placeholder="Variant name (e.g. Large)" className="flex-1 bg-background border border-border-default rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-500" onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addVariant(); } }} />
-                <input type="text" inputMode="decimal" value={newVariantPrice} onChange={(e) => setNewVariantPrice(e.target.value)} placeholder="Price (or leave empty)" className="w-32 bg-background border border-border-default rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-500" onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addVariant(); } }} />
+              <div className="flex gap-2 items-end">
+                <div className="flex-1 space-y-1">
+                  <input type="text" value={langTab === "en" ? newVariantName : newVariantNameNl} onChange={(e) => langTab === "en" ? setNewVariantName(e.target.value) : setNewVariantNameNl(e.target.value)} placeholder={langTab === "en" ? "Variant name (e.g. Large)" : "Variant naam (bijv. Groot)"} className="w-full bg-background border border-border-default rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-500" onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addVariant(); } }} />
+                  {langTab === "nl" && newVariantName.trim() && (
+                    <p className="text-[11px] text-gray-500">EN name: {newVariantName}</p>
+                  )}
+                  {langTab === "en" && newVariantNameNl.trim() && (
+                    <p className="text-[11px] text-gray-500">NL naam: {newVariantNameNl}</p>
+                  )}
+                </div>
+                <input type="text" inputMode="decimal" value={newVariantPrice} onChange={(e) => setNewVariantPrice(e.target.value)} placeholder="Price (or empty)" className="w-32 bg-background border border-border-default rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-500" onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addVariant(); } }} />
                 <button type="button" onClick={addVariant} className="px-3 py-2 bg-brand-gold/20 text-brand-gold border border-brand-gold/30 rounded-lg text-sm font-medium hover:bg-brand-gold/30"><Plus className="w-4 h-4" /></button>
               </div>
             </div>
@@ -420,13 +431,21 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
             <div className="space-y-2">
               {modifiers.map((m, i) => (
                 <div key={i} className="flex items-center gap-2 bg-background border border-border-default rounded-lg px-3 py-2">
-                  <span className="text-sm text-white flex-1">{m.name}</span>
+                  <span className="text-sm text-white flex-1">{displayName(m)}</span>
                   <span className="text-sm text-gray-400">{m.price ? `+&#x20AC; ${(m.price / 100).toFixed(2).replace(".", ",")}` : "Free"}</span>
                   <button type="button" onClick={() => removeModifier(i)} className="p-1 text-gray-500 hover:text-red-400"><Trash2 className="w-3.5 h-3.5" /></button>
                 </div>
               ))}
-              <div className="flex gap-2">
-                <input type="text" value={newModifierName} onChange={(e) => setNewModifierName(e.target.value)} placeholder="Add-on name (e.g. Extra Pork)" className="flex-1 bg-background border border-border-default rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-500" onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addModifier(); } }} />
+              <div className="flex gap-2 items-end">
+                <div className="flex-1 space-y-1">
+                  <input type="text" value={langTab === "en" ? newModifierName : newModifierNameNl} onChange={(e) => langTab === "en" ? setNewModifierName(e.target.value) : setNewModifierNameNl(e.target.value)} placeholder={langTab === "en" ? "Add-on name (e.g. Extra Pork)" : "Add-on naam (bijv. Extra Varkensvlees)"} className="w-full bg-background border border-border-default rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-500" onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addModifier(); } }} />
+                  {langTab === "nl" && newModifierName.trim() && (
+                    <p className="text-[11px] text-gray-500">EN name: {newModifierName}</p>
+                  )}
+                  {langTab === "en" && newModifierNameNl.trim() && (
+                    <p className="text-[11px] text-gray-500">NL naam: {newModifierNameNl}</p>
+                  )}
+                </div>
                 <input type="text" inputMode="decimal" value={newModifierPrice} onChange={(e) => setNewModifierPrice(e.target.value)} placeholder="Extra cost" className="w-32 bg-background border border-border-default rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-500" onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addModifier(); } }} />
                 <button type="button" onClick={addModifier} className="px-3 py-2 bg-brand-gold/20 text-brand-gold border border-brand-gold/30 rounded-lg text-sm font-medium hover:bg-brand-gold/30"><Plus className="w-4 h-4" /></button>
               </div>

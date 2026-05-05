@@ -61,18 +61,20 @@ model MenuItem {
 }
 
 model ProductVariant {
-  id        String @id @default(uuid())
+  id        String  @id @default(uuid())
   name      String
+  nameNl    String?
   price     Int // cents — override price for this variant (0 = same as base)
-  sortOrder Int    @default(0)
+  sortOrder Int     @default(0)
 
   menuItemId String
   menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
 }
 
 model ProductModifier {
-  id        String @id @default(uuid())
+  id        String  @id @default(uuid())
   name      String
+  nameNl    String?
   price     Int    @default(0) // cents — added to order total
   sortOrder Int    @default(0)
 
