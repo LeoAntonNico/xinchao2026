@@ -37,6 +37,9 @@ model MenuCategory {
 model MenuItem {
   id               String  @id @default(uuid())
   name             String
+  nameNl           String?
+  shortDescriptionNl String?
+  descriptionNl    String?
   description      String? // long description
   shortDescription String? // short excerpt
   price            Int // cents (EUR) — base price

@@ -75,14 +75,14 @@ async function main() {
   };
 
   const itemsSeed = [
-    { name: "Phở Bò", description: "Traditional beef noodle soup with herbs", price: 1395, imageUrl: images.phobo, catSlugs: ["pho"], sortOrder: 1, locs: [utrecht.id, wageningen.id], dietaryTags: ["dairy-free"], isSpicy: false },
+    { name: "Phở Bò", nameNl: "Phở Bò (Rundvlees)", shortDescription: "Phở met geroosterd rundvlees en verse kruiden", description: "Traditional beef noodle soup with herbs", price: 1395, imageUrl: images.phobo, catSlugs: ["pho"], sortOrder: 1, locs: [utrecht.id, wageningen.id], dietaryTags: ["dairy-free"], isSpicy: false },
     { name: "Phở Gà", description: "Chicken noodle soup with fresh herbs", price: 1295, imageUrl: images.phoga, catSlugs: ["pho"], sortOrder: 2, locs: [utrecht.id], dietaryTags: ["dairy-free", "gluten-free"], isSpicy: false },
-    { name: "Bún Chả", description: "Grilled pork with vermicelli noodles", price: 1495, imageUrl: images.buncha, catSlugs: ["bun"], sortOrder: 1, locs: [utrecht.id], dietaryTags: ["dairy-free"], isSpicy: true },
+    { name: "Bún Chả", nameNl: "Bún Chả (Geroosterd Varkensvlees)", shortDescriptionNl: "Gegrild varkensvlees met rijstvermicelli", descriptionNl: "Verse Hanoi-klassieker met gegrild varkensvlees en noedelsalade", description: "Grilled pork with vermicelli noodles", price: 1495, imageUrl: images.buncha, catSlugs: ["bun"], sortOrder: 1, locs: [utrecht.id], dietaryTags: ["dairy-free"], isSpicy: true },
     { name: "Bún Thịt Nướng", description: "Grilled pork with vermicelli and salad", price: 1445, imageUrl: images.bunthit, catSlugs: ["bun"], sortOrder: 2, locs: [wageningen.id], dietaryTags: ["dairy-free"], isSpicy: true },
     { name: "Cơm Tấm", description: "Broken rice with grilled pork chop", price: 1345, imageUrl: images.comtam, catSlugs: ["com"], sortOrder: 1, locs: [utrecht.id], dietaryTags: [], isSpicy: false },
     { name: "Cơm Gà", description: "Chicken rice with ginger sauce", price: 1295, imageUrl: images.comga, catSlugs: ["com"], sortOrder: 2, locs: [wageningen.id], dietaryTags: ["dairy-free"], isSpicy: false },
     { name: "Gỏi Cuốn", description: "Fresh spring rolls with shrimp and herbs", price: 795, imageUrl: images.goicuon, catSlugs: ["goi"], sortOrder: 1, locs: [utrecht.id], dietaryTags: ["dairy-free", "gluten-free"], isSpicy: false },
-    { name: "Trà Đá", description: "Vietnamese iced tea", price: 295, imageUrl: images.tra, catSlugs: ["drinks"], sortOrder: 1, locs: [utrecht.id, wageningen.id], dietaryTags: ["vegan"], isSpicy: false },
+    { name: "Trà Đá", nameNl: "Vietnamese IJsthee", descriptionNl: "Verfrissende ijsthee met citroengras", description: "Vietnamese iced tea", price: 295, imageUrl: images.tra, catSlugs: ["drinks"], sortOrder: 1, locs: [utrecht.id, wageningen.id], dietaryTags: ["vegan"], isSpicy: false },
     { name: "Cà Phê Sữa Đá", description: "Vietnamese iced coffee", price: 395, imageUrl: images.caphe, catSlugs: ["drinks"], sortOrder: 2, locs: [utrecht.id], dietaryTags: ["vegetarian"], isSpicy: false },
   ];
 
@@ -90,7 +90,11 @@ async function main() {
     await prisma.menuItem.create({
       data: {
         name: s.name,
+        nameNl: s.nameNl || null,
+        shortDescription: s.shortDescription || null,
+        shortDescriptionNl: s.shortDescriptionNl || null,
         description: s.description,
+        descriptionNl: s.descriptionNl || null,
         price: s.price,
         imageUrl: s.imageUrl,
         sortOrder: s.sortOrder,

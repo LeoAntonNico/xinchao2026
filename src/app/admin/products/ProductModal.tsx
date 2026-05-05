@@ -72,8 +72,12 @@ function Section({ title, children, open = true }: { title: string; children: Re
 export function ProductModal({ isOpen, onClose, onSave, editingItem, categories, locations, onCategoryCreated }: ProductModalProps) {
   // Core fields
   const [name, setName] = useState("");
+  const [nameNl, setNameNl] = useState("");
   const [shortDescription, setShortDescription] = useState("");
+  const [shortDescriptionNl, setShortDescriptionNl] = useState("");
   const [description, setDescription] = useState("");
+  const [descriptionNl, setDescriptionNl] = useState("");
+  const [langTab, setLangTab] = useState<"en" | "nl">("en");
   const [priceEur, setPriceEur] = useState("");
   const [salePriceEur, setSalePriceEur] = useState("");
   const [taxClass, setTaxClass] = useState("standard");
@@ -204,7 +208,8 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
     const priceNum = inputToCents(priceEur)!;
     const saleNum = inputToCents(salePriceEur);
     const payload = {
-      name, description: description || null, shortDescription: shortDescription || null,
+      name, nameNl: nameNl || null, description: description || null, descriptionNl: descriptionNl || null,
+      shortDescription: shortDescription || null, shortDescriptionNl: shortDescriptionNl || null,
       price: priceNum, salePrice: saleNum, taxClass,
       imageUrl: imageUrl || null, imageUrls: imageUrls || [], isAvailable,
       categoryIds, locationIds, sortOrder: parseInt(sortOrder) || 0,

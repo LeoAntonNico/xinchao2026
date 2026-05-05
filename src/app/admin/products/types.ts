@@ -5,8 +5,11 @@ export interface Modifier { id: string; name: string; price: number; sortOrder: 
 export interface MenuItem {
   id: string;
   name: string;
+  nameNl: string | null;
   description: string | null;
+  descriptionNl: string | null;
   shortDescription: string | null;
+  shortDescriptionNl: string | null;
   price: number;
   salePrice: number | null;
   taxClass: string;

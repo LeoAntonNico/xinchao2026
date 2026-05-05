@@ -85,7 +85,7 @@ export default function OrderPage() {
   useEffect(() => {
     if (!selectedLocation) return;
     fetch(`/api/slots?locationId=${selectedLocation}&days=7`).then((r) => r.json()).then(setSlots);
-    fetch(`/api/menu?locationId=${selectedLocation}`).then((r) => r.json()).then(setCategories);
+    fetch(`/api/menu?locationId=${selectedLocation}&locale=${locale}`).then((r) => r.json()).then(setCategories);
   }, [selectedLocation]);
 
   useEffect(() => {

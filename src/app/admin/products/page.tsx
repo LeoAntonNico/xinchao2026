@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Package, Pencil, Trash2, Flame, Image, Layers, Puzzle } from "lucide-react";
+import { Plus, Package, Pencil, Trash2, Flame, Image, Layers, Puzzle, Globe } from "lucide-react";
 import { ProductModal } from "./ProductModal";
 import type { MenuItem, Category, Location } from "./types";
 
@@ -106,6 +106,7 @@ export default function ProductsPage() {
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-1.5">
                     <span className="text-white font-medium">{item.name}</span>
+                    {item.nameNl && <span title="Has NL translation"><Globe className="w-3 h-3 text-blue-400" /></span>}
                     {item.isSpicy && <Flame className="w-3.5 h-3.5 text-orange-400" />}
                   </div>
                   {item.shortDescription && <p className="text-xs text-gray-500 mt-0.5 line-clamp-1 max-w-[200px]">{item.shortDescription}</p>}
