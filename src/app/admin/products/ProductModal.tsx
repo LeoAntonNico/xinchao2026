@@ -2,6 +2,14 @@
 
 import { useState, useEffect, useCallback } from "react";
 
+function check401(response: Response) {
+  if (response.status === 401) {
+    window.location.href = "/admin/login";
+    return true;
+  }
+  return false;
+}
+
 interface Category { id: string; name: string; }
 interface Location { id: string; name: string; }
 interface MenuItem {
@@ -120,6 +128,7 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
         credentials: "include",
         body: JSON.stringify({ name: newCatName.trim(), sortOrder: categories.length + 1 }),
       });
+      if (check401(res)) return;
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
         setErrors([err.error || `Failed (${res.status})`]);
@@ -167,6 +176,7 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
         credentials: "include",
         body: JSON.stringify(payload),
       });
+      if (check401(res)) return;
       if (!res.ok) throw new Error("Save failed");
       const item = await res.json();
       onSave(item);

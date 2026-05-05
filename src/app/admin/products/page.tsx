@@ -4,6 +4,14 @@ import { useState, useEffect } from "react";
 import { Plus, Package, Pencil, Trash2 } from "lucide-react";
 import { ProductModal } from "./ProductModal";
 
+function check401(response: Response) {
+  if (response.status === 401) {
+    window.location.href = "/admin/login";
+    return true;
+  }
+  return false;
+}
+
 interface Category { id: string; name: string; }
 interface Location { id: string; name: string; }
 interface MenuItem {
@@ -30,9 +38,9 @@ export default function ProductsPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch("/api/admin/menu-items", { credentials: "include" }).then(async (r) => (r.ok ? r.json() : [])),
-      fetch("/api/admin/categories", { credentials: "include" }).then(async (r) => (r.ok ? r.json() : [])),
-      fetch("/api/admin/locations", { credentials: "include" }).then(async (r) => (r.ok ? r.json() : [])),
+      fetch("/api/admin/menu-items", { credentials: "include" }).then(async (r) => { if (check401(r)) return []; return r.ok ? r.json() : []; }),
+      fetch("/api/admin/categories", { credentials: "include" }).then(async (r) => { if (check401(r)) return []; return r.ok ? r.json() : []; }),
+      fetch("/api/admin/locations", { credentials: "include" }).then(async (r) => { if (check401(r)) return []; return r.ok ? r.json() : []; }),
     ]).then(([itemsData, catsData, locsData]) => {
       setItems(Array.isArray(itemsData) ? itemsData : []);
       setCategories(Array.isArray(catsData) ? catsData : []);
@@ -65,7 +73,8 @@ export default function ProductsPage() {
     if (!confirm("Delete this product?")) return;
     setDeletingId(id);
     try {
-      const res = await fetch(`/api/admin/menu-items/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/admin/menu-items/${id}`, { method: "DELETE", credentials: "include" });
+      if (check401(res)) return;
       if (res.ok) setItems((prev) => prev.filter((i) => i.id !== id));
     } finally {
       setDeletingId(null);
