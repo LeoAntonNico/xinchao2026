@@ -7,11 +7,25 @@ interface CartItem {
   name: string;
   price: number;
   quantity: number;
+  variantId?: string;
+  variantName?: string;
+  modifierIds?: string[];
+  modifierNames?: string[];
+}
+
+interface AddItemPayload {
+  menuItemId: string;
+  name: string;
+  price: number;
+  variantId?: string;
+  variantName?: string;
+  modifierIds?: string[];
+  modifierNames?: string[];
 }
 
 interface CartContextValue {
   items: CartItem[];
-  addItem: (item: Omit<CartItem, "quantity">) => void;
+  addItem: (item: AddItemPayload) => void;
   removeItem: (menuItemId: string) => void;
   decreaseItem: (menuItemId: string) => void;
   updateQuantity: (menuItemId: string, quantity: number) => void;
@@ -23,19 +37,21 @@ interface CartContextValue {
 
 const CartContext = createContext<CartContextValue | null>(null);
 
+function itemKey(it: { menuItemId: string; variantId?: string; modifierIds?: string[] }) {
+  const mods = (it.modifierIds || []).sort().join(",");
+  return `${it.menuItemId}:${it.variantId || ""}:${mods}`;
+}
+
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [isOpen, setIsOpen] = useState(false);
 
-  const addItem = useCallback((newItem: Omit<CartItem, "quantity">) => {
+  const addItem = useCallback((newItem: AddItemPayload) => {
     setItems((prev) => {
-      const existing = prev.find((i) => i.menuItemId === newItem.menuItemId);
+      const key = itemKey(newItem);
+      const existing = prev.find((i) => itemKey(i) === key);
       if (existing) {
-        return prev.map((i) =>
-          i.menuItemId === newItem.menuItemId
-            ? { ...i, quantity: i.quantity + 1 }
-            : i
-        );
+        return prev.map((i) => itemKey(i) === key ? { ...i, quantity: i.quantity + 1 } : i);
       }
       return [...prev, { ...newItem, quantity: 1 }];
     });
@@ -47,14 +63,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const decreaseItem = useCallback((menuItemId: string) => {
     setItems((prev) => {
-      const existing = prev.find((i) => i.menuItemId === menuItemId);
-      if (!existing) return prev;
-      if (existing.quantity === 1) {
-        return prev.filter((i) => i.menuItemId !== menuItemId);
-      }
-      return prev.map((i) =>
-        i.menuItemId === menuItemId ? { ...i, quantity: i.quantity - 1 } : i
-      );
+      const allForProduct = prev.filter((i) => i.menuItemId === menuItemId);
+      if (allForProduct.length === 0) return prev;
+      const last = allForProduct[allForProduct.length - 1];
+      if (last.quantity === 1) return prev.filter((i) => itemKey(i) !== itemKey(last));
+      return prev.map((i) => itemKey(i) === itemKey(last) ? { ...i, quantity: i.quantity - 1 } : i);
     });
   }, []);
 
@@ -63,19 +76,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
       removeItem(menuItemId);
       return;
     }
-    setItems((prev) =>
-      prev.map((i) => (i.menuItemId === menuItemId ? { ...i, quantity } : i))
-    );
+    setItems((prev) => prev.map((i) => (i.menuItemId === menuItemId ? { ...i, quantity } : i)));
   }, [removeItem]);
 
   const clearCart = useCallback(() => setItems([]), []);
-
   const total = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
 
   return (
-    <CartContext.Provider
-      value={{ items, addItem, removeItem, decreaseItem, updateQuantity, clearCart, total, isOpen, setIsOpen }}
-    >
+    <CartContext.Provider value={{ items, addItem, removeItem, decreaseItem, updateQuantity, clearCart, total, isOpen, setIsOpen }}>
       {children}
     </CartContext.Provider>
   );
