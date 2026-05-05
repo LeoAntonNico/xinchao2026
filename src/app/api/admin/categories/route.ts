@@ -33,7 +33,7 @@ export async function DELETE(request: NextRequest) {
   const id = searchParams.get("id");
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
-  const count = await prisma.menuItem.count({ where: { categoryId: id } });
+  const count = await prisma.menuItem.count({ where: { categories: { some: { id } } } });
   if (count > 0) return NextResponse.json({ error: "Category has items" }, { status: 400 });
 
   await prisma.menuCategory.delete({ where: { id } });

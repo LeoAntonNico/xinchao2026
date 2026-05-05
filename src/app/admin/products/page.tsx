@@ -1,16 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Package, Pencil, Trash2 } from "lucide-react";
+import { Plus, Package, Pencil, Trash2, Flame } from "lucide-react";
 import { ProductModal } from "./ProductModal";
-
-function check401(response: Response) {
-  if (response.status === 401) {
-    window.location.href = "/admin/login";
-    return true;
-  }
-  return false;
-}
 
 interface Category { id: string; name: string; }
 interface Location { id: string; name: string; }
@@ -22,10 +14,27 @@ interface MenuItem {
   imageUrl: string | null;
   isAvailable: boolean;
   sortOrder: number;
-  categoryId: string;
   locations: Location[];
-  category?: Category;
+  categories: Category[];
+  dietaryTags: string[];
+  isSpicy: boolean;
 }
+
+function check401(response: Response) {
+  if (response.status === 401) {
+    window.location.href = "/admin/login";
+    return true;
+  }
+  return false;
+}
+
+const DIETARY_LABELS: Record<string, string> = {
+  vegan: "V",
+  vegetarian: "VG",
+  "gluten-free": "GF",
+  "dairy-free": "DF",
+  "nut-free": "NF",
+};
 
 export default function ProductsPage() {
   const [items, setItems] = useState<MenuItem[]>([]);
@@ -86,7 +95,7 @@ export default function ProductsPage() {
   }
 
   const formatPrice = (cents: number) =>
-    `€ ${(cents / 100).toFixed(2).replace(".", ",")}`;
+    `E$ ${(cents / 100).toFixed(2).replace(".", ",")}`;
 
   if (loading) return <div className="text-gray-400 p-6">Loading...</div>;
 
@@ -111,9 +120,10 @@ export default function ProductsPage() {
             <tr className="border-b border-border-default text-gray-400 text-left">
               <th className="px-4 py-3 font-medium">Image</th>
               <th className="px-4 py-3 font-medium">Name</th>
-              <th className="px-4 py-3 font-medium">Category</th>
+              <th className="px-4 py-3 font-medium">Categories</th>
               <th className="px-4 py-3 font-medium">Price</th>
               <th className="px-4 py-3 font-medium">Locations</th>
+              <th className="px-4 py-3 font-medium">Tags</th>
               <th className="px-4 py-3 font-medium">Available</th>
               <th className="px-4 py-3 font-medium text-right">Actions</th>
             </tr>
@@ -128,8 +138,21 @@ export default function ProductsPage() {
                     <div className="w-12 h-12 bg-background rounded-lg border border-border-default" />
                   )}
                 </td>
-                <td className="px-4 py-3 text-white font-medium">{item.name}</td>
-                <td className="px-4 py-3 text-gray-300">{item.category?.name || "-"}</td>
+                <td className="px-4 py-3 text-white font-medium">
+                  <div className="flex items-center gap-1.5">
+                    {item.name}
+                    {item.isSpicy && <Flame className="w-3.5 h-3.5 text-orange-400" />}
+                  </div>
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex flex-wrap gap-1">
+                    {item.categories?.map((cat) => (
+                      <span key={cat.id} className="px-2 py-0.5 rounded text-xs border border-border-default text-gray-300">
+                        {cat.name}
+                      </span>
+                    )) || <span className="text-gray-500 text-xs">-</span>}
+                  </div>
+                </td>
                 <td className="px-4 py-3 text-gray-300">{formatPrice(item.price)}</td>
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap gap-1">
@@ -138,6 +161,15 @@ export default function ProductsPage() {
                         {loc.name}
                       </span>
                     )) || <span className="text-gray-500 text-xs">-</span>}
+                  </div>
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex flex-wrap gap-1">
+                    {item.dietaryTags?.map((tag) => (
+                      <span key={tag} className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-500/15 text-emerald-400 border border-emerald-500/20" title={tag}>
+                        {DIETARY_LABELS[tag] || tag}
+                      </span>
+                    ))}
                   </div>
                 </td>
                 <td className="px-4 py-3">

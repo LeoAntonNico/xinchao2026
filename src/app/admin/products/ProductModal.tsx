@@ -20,10 +20,19 @@ interface MenuItem {
   imageUrl: string | null;
   isAvailable: boolean;
   sortOrder: number;
-  categoryId: string;
   locations: Location[];
-  category?: Category;
+  categories: Category[];
+  dietaryTags: string[];
+  isSpicy: boolean;
 }
+
+const DIETARY_OPTIONS = [
+  { value: "vegan", label: "Vegan" },
+  { value: "vegetarian", label: "Vegetarian" },
+  { value: "gluten-free", label: "Gluten-Free" },
+  { value: "dairy-free", label: "Dairy-Free" },
+  { value: "nut-free", label: "Nut-Free" },
+];
 
 interface ProductModalProps {
   isOpen: boolean;
@@ -61,7 +70,7 @@ function CheckCard({
             : "border-gray-500 bg-transparent"
         }`}
       >
-        {checked && <span className="text-white text-xs font-bold">✓</span>}
+        {checked && <span className="text-white text-xs font-bold">&#10003;</span>}
       </span>
       {label}
     </button>
@@ -74,9 +83,11 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
   const [priceEur, setPriceEur] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [isAvailable, setIsAvailable] = useState(true);
-  const [categoryId, setCategoryId] = useState("");
+  const [categoryIds, setCategoryIds] = useState<string[]>([]);
   const [locationIds, setLocationIds] = useState<string[]>([]);
   const [sortOrder, setSortOrder] = useState("0");
+  const [dietaryTags, setDietaryTags] = useState<string[]>([]);
+  const [isSpicy, setIsSpicy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   const [showNewCat, setShowNewCat] = useState(false);
@@ -90,18 +101,22 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
       setPriceEur((editingItem.price / 100).toFixed(2).replace(".", ","));
       setImageUrl(editingItem.imageUrl || "");
       setIsAvailable(editingItem.isAvailable);
-      setCategoryId(editingItem.categoryId);
+      setCategoryIds(editingItem.categories?.map((c) => c.id) || []);
       setLocationIds(editingItem.locations?.map((l) => l.id) || []);
       setSortOrder(String(editingItem.sortOrder));
+      setDietaryTags(editingItem.dietaryTags || []);
+      setIsSpicy(editingItem.isSpicy || false);
     } else {
       setName("");
       setDescription("");
       setPriceEur("");
       setImageUrl("");
       setIsAvailable(true);
-      setCategoryId(categories[0]?.id || "");
+      setCategoryIds(categories[0] ? [categories[0].id] : []);
       setLocationIds(locations[0] ? [locations[0].id] : []);
       setSortOrder("0");
+      setDietaryTags([]);
+      setIsSpicy(false);
     }
     setErrors([]);
     setSaving(false);
@@ -113,10 +128,10 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
     const errs: string[] = [];
     if (!name.trim()) errs.push("Name is required");
     if (!priceEur || isNaN(parseFloat(priceEur.replace(",", ".")))) errs.push("Valid price is required");
-    if (!categoryId) errs.push("Category is required");
+    if (categoryIds.length === 0) errs.push("At least one category is required");
     if (locationIds.length === 0) errs.push("At least one location is required");
     return errs;
-  }, [name, priceEur, categoryId, locationIds]);
+  }, [name, priceEur, categoryIds, locationIds]);
 
   async function handleCreateCategory() {
     if (!newCatName.trim()) return;
@@ -136,7 +151,7 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
       }
       const cat = await res.json();
       onCategoryCreated?.(cat);
-      setCategoryId(cat.id);
+      setCategoryIds((prev) => [...prev, cat.id]);
       setShowNewCat(false);
       setNewCatName("");
     } catch {
@@ -162,9 +177,11 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
       price: priceNum,
       imageUrl: imageUrl || null,
       isAvailable,
-      categoryId,
+      categoryIds,
       locationIds,
       sortOrder: parseInt(sortOrder) || 0,
+      dietaryTags,
+      isSpicy,
     };
 
     try {
@@ -268,7 +285,34 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
             )}
           </div>
 
-          {/* Category row + add new */}
+          <div>
+            <label className="block text-xs font-medium text-gray-400 mb-2">Dietary Tags</label>
+            <div className="flex flex-wrap gap-2">
+              {DIETARY_OPTIONS.map((opt) => (
+                <CheckCard
+                  key={opt.value}
+                  label={opt.label}
+                  checked={dietaryTags.includes(opt.value)}
+                  onChange={() =>
+                    setDietaryTags((prev) =>
+                      prev.includes(opt.value) ? prev.filter((v) => v !== opt.value) : [...prev, opt.value]
+                    )
+                  }
+                />
+              ))}
+            </div>
+          </div>
+
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={isSpicy}
+              onChange={(e) => setIsSpicy(e.target.checked)}
+              className="w-4 h-4 rounded accent-brand-red"
+            />
+            <span className="text-sm text-gray-300">Spicy</span>
+          </label>
+
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs font-medium text-gray-400">Category</label>
@@ -314,14 +358,17 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
                 <CheckCard
                   key={c.id}
                   label={c.name}
-                  checked={categoryId === c.id}
-                  onChange={() => setCategoryId(c.id)}
+                  checked={categoryIds.includes(c.id)}
+                  onChange={() =>
+                    setCategoryIds((prev) =>
+                      prev.includes(c.id) ? prev.filter((id) => id !== c.id) : [...prev, c.id]
+                    )
+                  }
                 />
               ))}
             </div>
           </div>
 
-          {/* Location tick boxes - multi-select */}
           <div>
             <label className="block text-xs font-medium text-gray-400 mb-2">Locations</label>
             <div className="flex flex-wrap gap-2">

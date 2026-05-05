@@ -13,7 +13,7 @@ export async function GET(
   const { id } = await params;
   const item = await prisma.menuItem.findUnique({
     where: { id },
-    include: { category: true, locations: true },
+    include: { categories: true, locations: true },
   });
   if (!item) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json(item);
@@ -28,7 +28,7 @@ export async function PATCH(
 
   const { id } = await params;
   const body = await request.json();
-  const { name, description, price, imageUrl, isAvailable, categoryId, locationIds, sortOrder } = body;
+  const { name, description, price, imageUrl, isAvailable, categoryIds, locationIds, sortOrder } = body;
 
   const data: Record<string, unknown> = {};
   if (name !== undefined) data.name = name;
@@ -36,8 +36,10 @@ export async function PATCH(
   if (price !== undefined) data.price = price;
   if (imageUrl !== undefined) data.imageUrl = imageUrl;
   if (isAvailable !== undefined) data.isAvailable = isAvailable;
-  if (categoryId !== undefined) data.categoryId = categoryId;
   if (sortOrder !== undefined) data.sortOrder = sortOrder;
+  if (categoryIds !== undefined) {
+    data.categories = { set: categoryIds.map((id: string) => ({ id })) };
+  }
   if (locationIds !== undefined) {
     data.locations = { set: locationIds.map((id: string) => ({ id })) };
   }
@@ -45,7 +47,7 @@ export async function PATCH(
   const item = await prisma.menuItem.update({
     where: { id },
     data,
-    include: { category: true, locations: true },
+    include: { categories: true, locations: true },
   });
   return NextResponse.json(item);
 }

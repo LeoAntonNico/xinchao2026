@@ -43,8 +43,10 @@ model MenuItem {
   isAvailable Boolean @default(true)
   sortOrder   Int     @default(0)
 
-  categoryId String
-  category   MenuCategory @relation(fields: [categoryId], references: [id])
+  dietaryTags String[] @default([]) // vegan, gluten-free, dairy-free, nut-free
+  isSpicy     Boolean @default(false)
+
+  categories MenuCategory[]
 
   locations Location[]
   orderItems OrderItem[]

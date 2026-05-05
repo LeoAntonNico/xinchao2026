@@ -73,15 +73,15 @@ async function main() {
   };
 
   const itemsSeed = [
-    { name: "Phở Bò", description: "Traditional beef noodle soup with herbs", price: 1395, imageUrl: images.phobo, slug: "pho", sortOrder: 1, locs: [utrecht.id, wageningen.id] },
-    { name: "Phở Gà", description: "Chicken noodle soup with fresh herbs", price: 1295, imageUrl: images.phoga, slug: "pho", sortOrder: 2, locs: [utrecht.id] },
-    { name: "Bún Chả", description: "Grilled pork with vermicelli noodles", price: 1495, imageUrl: images.buncha, slug: "bun", sortOrder: 1, locs: [utrecht.id] },
-    { name: "Bún Thịt Nướng", description: "Grilled pork with vermicelli and salad", price: 1445, imageUrl: images.bunthit, slug: "bun", sortOrder: 2, locs: [wageningen.id] },
-    { name: "Cơm Tấm", description: "Broken rice with grilled pork chop", price: 1345, imageUrl: images.comtam, slug: "com", sortOrder: 1, locs: [utrecht.id] },
-    { name: "Cơm Gà", description: "Chicken rice with ginger sauce", price: 1295, imageUrl: images.comga, slug: "com", sortOrder: 2, locs: [wageningen.id] },
-    { name: "Gỏi Cuốn", description: "Fresh spring rolls with shrimp and herbs", price: 795, imageUrl: images.goicuon, slug: "goi", sortOrder: 1, locs: [utrecht.id] },
-    { name: "Trà Đá", description: "Vietnamese iced tea", price: 295, imageUrl: images.tra, slug: "drinks", sortOrder: 1, locs: [utrecht.id, wageningen.id] },
-    { name: "Cà Phê Sữa Đá", description: "Vietnamese iced coffee", price: 395, imageUrl: images.caphe, slug: "drinks", sortOrder: 2, locs: [utrecht.id] },
+    { name: "Phở Bò", description: "Traditional beef noodle soup with herbs", price: 1395, imageUrl: images.phobo, catSlugs: ["pho"], sortOrder: 1, locs: [utrecht.id, wageningen.id], dietaryTags: ["dairy-free"], isSpicy: false },
+    { name: "Phở Gà", description: "Chicken noodle soup with fresh herbs", price: 1295, imageUrl: images.phoga, catSlugs: ["pho"], sortOrder: 2, locs: [utrecht.id], dietaryTags: ["dairy-free", "gluten-free"], isSpicy: false },
+    { name: "Bún Chả", description: "Grilled pork with vermicelli noodles", price: 1495, imageUrl: images.buncha, catSlugs: ["bun"], sortOrder: 1, locs: [utrecht.id], dietaryTags: ["dairy-free"], isSpicy: true },
+    { name: "Bún Thịt Nướng", description: "Grilled pork with vermicelli and salad", price: 1445, imageUrl: images.bunthit, catSlugs: ["bun"], sortOrder: 2, locs: [wageningen.id], dietaryTags: ["dairy-free"], isSpicy: true },
+    { name: "Cơm Tấm", description: "Broken rice with grilled pork chop", price: 1345, imageUrl: images.comtam, catSlugs: ["com"], sortOrder: 1, locs: [utrecht.id], dietaryTags: [], isSpicy: false },
+    { name: "Cơm Gà", description: "Chicken rice with ginger sauce", price: 1295, imageUrl: images.comga, catSlugs: ["com"], sortOrder: 2, locs: [wageningen.id], dietaryTags: ["dairy-free"], isSpicy: false },
+    { name: "Gỏi Cuốn", description: "Fresh spring rolls with shrimp and herbs", price: 795, imageUrl: images.goicuon, catSlugs: ["goi"], sortOrder: 1, locs: [utrecht.id], dietaryTags: ["dairy-free", "gluten-free"], isSpicy: false },
+    { name: "Trà Đá", description: "Vietnamese iced tea", price: 295, imageUrl: images.tra, catSlugs: ["drinks"], sortOrder: 1, locs: [utrecht.id, wageningen.id], dietaryTags: ["vegan"], isSpicy: false },
+    { name: "Cà Phê Sữa Đá", description: "Vietnamese iced coffee", price: 395, imageUrl: images.caphe, catSlugs: ["drinks"], sortOrder: 2, locs: [utrecht.id], dietaryTags: ["vegetarian"], isSpicy: false },
   ];
 
   for (const s of itemsSeed) {
@@ -92,8 +92,10 @@ async function main() {
         price: s.price,
         imageUrl: s.imageUrl,
         sortOrder: s.sortOrder,
-        categoryId: getCatId(s.slug),
+        categories: { connect: s.catSlugs.map((slug) => ({ id: getCatId(slug) })) },
         locations: { connect: s.locs.map((id) => ({ id })) },
+        dietaryTags: s.dietaryTags,
+        isSpicy: s.isSpicy,
       },
     });
   }
