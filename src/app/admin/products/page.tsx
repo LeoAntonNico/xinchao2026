@@ -30,13 +30,13 @@ export default function ProductsPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch("/api/admin/menu-items").then((r) => r.json()),
-      fetch("/api/admin/categories").then((r) => r.json()),
-      fetch("/api/admin/locations").then((r) => r.json()),
+      fetch("/api/admin/menu-items").then(async (r) => (r.ok ? r.json() : [])),
+      fetch("/api/admin/categories").then(async (r) => (r.ok ? r.json() : [])),
+      fetch("/api/admin/locations").then(async (r) => (r.ok ? r.json() : [])),
     ]).then(([itemsData, catsData, locsData]) => {
-      setItems(itemsData);
-      setCategories(catsData);
-      setLocations(locsData);
+      setItems(Array.isArray(itemsData) ? itemsData : []);
+      setCategories(Array.isArray(catsData) ? catsData : []);
+      setLocations(Array.isArray(locsData) ? locsData : []);
       setLoading(false);
     });
   }, []);
