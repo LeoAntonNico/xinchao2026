@@ -126,9 +126,13 @@ model Order {
 }
 
 model OrderItem {
-  id       String @id @default(uuid())
-  quantity Int
-  price    Int // snapshot at time of order (cents)
+  id            String @id @default(uuid())
+  quantity      Int
+  price         Int // snapshot at time of order (cents)
+  variantId     String?
+  variantName   String?
+  modifierIds   String[] @default([])
+  modifierNames String[] @default([])
 
   orderId    String
   menuItemId String

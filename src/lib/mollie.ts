@@ -13,6 +13,7 @@ interface CreatePaymentInput {
   description: string;
   redirectUrl: string;
   webhookUrl?: string;
+  method?: string; // e.g. "ideal", "card", "bancontact", etc.
   metadata?: Record<string, unknown>;
 }
 
@@ -27,6 +28,7 @@ export async function createPayment(input: CreatePaymentInput) {
     description: input.description,
     redirectUrl: input.redirectUrl,
     ...(input.webhookUrl ? { webhookUrl: input.webhookUrl } : {}),
+    ...(input.method ? { method: input.method as any } : {}),
     ...(input.metadata ? { metadata: input.metadata } : {}),
   };
 
@@ -35,4 +37,8 @@ export async function createPayment(input: CreatePaymentInput) {
 
 export async function getPayment(id: string) {
   return mollieClient.payments.get(id);
+}
+
+export async function listMethods() {
+  return mollieClient.methods.list();
 }
