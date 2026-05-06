@@ -146,15 +146,15 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
 
   const validate = useCallback(() => {
     const errs: string[] = [];
-    if (!name.trim()) errs.push("Name required");
-    if (!priceEur || isNaN(parseFloat(priceEur.replace(",", ".")))) errs.push("Valid base price required");
-    if (categoryIds.length === 0) errs.push("At least one category");
-    if (locationIds.length === 0) errs.push("At least one location");
+    if (!name.trim()) errs.push(langTab === "nl" ? "Naam verplicht" : "Name required");
+    if (!priceEur || isNaN(parseFloat(priceEur.replace(",", ".")))) errs.push(langTab === "nl" ? "Geldige basisprijs verplicht" : "Valid base price required");
+    if (categoryIds.length === 0) errs.push(langTab === "nl" ? "Minimaal één categorie" : "At least one category");
+    if (locationIds.length === 0) errs.push(langTab === "nl" ? "Minimaal één locatie" : "At least one location");
     // Validate variant names for selected language
     const vNameEmpty = variants.some((v) => langTab === "en" ? !v.name.trim() : !v.nameNl?.trim() && !v.name.trim());
-    if (vNameEmpty) errs.push(`All variants need a ${langTab === "en" ? "name" : "Dutch name"}`);
+    if (vNameEmpty) errs.push(`All variants need a ${langTab === "en" ? "naam" : "Nederlandse naam"}`);
     const mNameEmpty = modifiers.some((m) => langTab === "nl" ? !m.nameNl?.trim() && !m.name.trim() : false);
-    if (mNameEmpty) errs.push("All modifiers need a Dutch name");
+    if (mNameEmpty) errs.push(langTab === "nl" ? "Alle toevoegingen hebben een Nederlandse naam nodig" : "All modifiers need a Dutch name");
     return errs;
   }, [name, priceEur, categoryIds, locationIds, variants, modifiers, langTab]);
 
@@ -252,7 +252,7 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
       onSave(newItem);
       onClose();
     } catch {
-      setErrors(["Failed to save. Try again."]);
+      setErrors([langTab === "nl" ? "Opslaan mislukt. Probeer opnieuw." : "Failed to save. Try again."]);
     } finally { setSaving(false); }
   }
 
@@ -315,7 +315,7 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-start justify-center z-50 pt-12 overflow-y-auto pb-10">
       <div className="bg-sidebar border border-border-default rounded-xl w-full max-w-3xl mx-4 shadow-2xl mb-20">
         <div className="px-6 py-4 border-b border-border-default flex items-center justify-between sticky top-0 bg-sidebar z-20 rounded-t-xl">
-          <h2 className="text-lg font-bold text-white">{editingItem ? "Edit Product" : "Add Product"}</h2>
+          <h2 className="text-lg font-bold text-white">{editingItem ? (langTab === "nl" ? "Product Bewerken" : "Edit Product") : (langTab === "nl" ? "Product Toevoegen" : "Add Product")}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-white text-xl leading-none">&times;</button>
         </div>
 
@@ -328,7 +328,7 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
             </div>
             {editingItem && (
               <span className="text-xs text-gray-500">
-                {nameNl || shortDescriptionNl || descriptionNl || variants.some(v => v.nameNl) || modifiers.some(m => m.nameNl) ? "Has Dutch content" : "No Dutch content yet"}
+                {nameNl || shortDescriptionNl || descriptionNl || variants.some(v => v.nameNl) || modifiers.some(m => m.nameNl) ? langTab === "nl" ? "Heeft Nederlandse content" : "Has Dutch content" : langTab === "nl" ? "Nog geen Nederlandse content" : "No Dutch content yet"}
               </span>
             )}
           </div>
@@ -338,7 +338,7 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
           )}
 
           {/* CONTENT */}
-          <Section title="Content">
+          <Section title={langTab === "nl" ? "Inhoud" : "Content"}>
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-medium text-gray-400 mb-1">{langTab === "en" ? "Product Name" : "Productnaam"} <span className="text-red-400">*</span></label>
@@ -355,18 +355,18 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
 
               {/* Gallery */}
               <div>
-                <label className="block text-xs font-medium text-gray-400 mb-2">Product Gallery</label>
+                <label className="block text-xs font-medium text-gray-400 mb-2">{langTab === "nl" ? "Product Galerij" : "Product Gallery"}</label>
                 <div className="flex flex-wrap gap-3">
                   {imageUrls.map((url, idx) => (
                     <div key={idx} className="relative group">
                       <img src={url} alt={`img-${idx}`} className={`w-20 h-20 object-cover rounded-lg border-2 cursor-pointer ${imageUrl === url ? "border-brand-gold" : "border-border-default"}`} onClick={() => setPrimary(url)} />
                       <button type="button" onClick={() => removeImage(idx)} className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><X className="w-3 h-3 text-white" /></button>
-                      {imageUrl === url && <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 text-[9px] font-bold text-brand-gold bg-black/80 px-1 rounded">Primary</span>}
+                      {imageUrl === url && <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 text-[9px] font-bold text-brand-gold bg-black/80 px-1 rounded">{langTab === "nl" ? "Hoofdafbeelding" : "Primary"}</span>}
                     </div>
                   ))}
                   <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading} className="w-20 h-20 rounded-lg border-2 border-dashed border-gray-600 flex flex-col items-center justify-center text-gray-400 hover:border-gray-400 hover:text-gray-300 transition-colors">
                     <Upload className="w-5 h-5 mb-1" />
-                    <span className="text-[10px]">{uploading ? "..." : "Upload"}</span>
+                    <span className="text-[10px]">{uploading ? "..." : (langTab === "nl" ? "Uploaden" : "Upload")}</span>
                   </button>
                   <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
                 </div>
@@ -376,15 +376,15 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
           </Section>
 
           {/* PRICING */}
-          <Section title="Pricing">
+          <Section title={langTab === "nl" ? "Prijzen" : "Pricing"}>
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <label className="block text-xs font-medium text-gray-400 mb-1">Regular Price (&#x20AC;)</label>
+                <label className="block text-xs font-medium text-gray-400 mb-1">{langTab === "nl" ? "Normale Prijs (&#x20AC;)" : "Regular Price (&#x20AC;)"}</label>
                 <input type="text" inputMode="decimal" value={priceEur} onChange={(e) => setPriceEur(e.target.value)}
                   className="w-full bg-background border border-border-default rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-500" placeholder="14,95" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-400 mb-1">Sale Price (&#x20AC;)</label>
+                <label className="block text-xs font-medium text-gray-400 mb-1">{langTab === "nl" ? "Actie Prijs (&#x20AC;)" : "Sale Price (&#x20AC;)"}</label>
                 <input type="text" inputMode="decimal" value={salePriceEur} onChange={(e) => setSalePriceEur(e.target.value)}
                   className="w-full bg-background border border-border-default rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-500" placeholder="11,95" />
                 {salePriceEur && inputToCents(salePriceEur) && inputToCents(priceEur) && inputToCents(salePriceEur)! >= inputToCents(priceEur)! ? (
@@ -392,7 +392,7 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
                 ) : null}
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-400 mb-1">Tax Class</label>
+                <label className="block text-xs font-medium text-gray-400 mb-1">{langTab === "nl" ? "Belastingklasse" : "Tax Class"}</label>
                 <select value={taxClass} onChange={(e) => setTaxClass(e.target.value)} className="w-full bg-background border border-border-default rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-500">
                   {TAX_CLASSES.map((tc) => <option key={tc.value} value={tc.value}>{tc.label}</option>)}
                 </select>
@@ -401,12 +401,12 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
           </Section>
 
           {/* VARIANTS */}
-          <Section title="Variations (Size / Portion Options)">
+          <Section title={langTab === "nl" ? "Varianten (Grootte / Portie)" : "Variations (Size / Portion Options)"}>
             <div className="space-y-2">
               {variants.map((v, i) => (
                 <div key={i} className="flex items-center gap-2 bg-background border border-border-default rounded-lg px-3 py-2">
                   <span className="text-sm text-white flex-1">{displayName(v)}</span>
-                  <span className="text-sm text-gray-400">{v.price ? `&#x20AC; ${(v.price / 100).toFixed(2).replace(".", ",")}` : "Same as base"}</span>
+                  <span className="text-sm text-gray-400">{v.price ? `&#x20AC; ${(v.price / 100).toFixed(2).replace(".", ",")}` : langTab === "nl" ? "Zelfde als basis" : "Same as base"}</span>
                   <button type="button" onClick={() => removeVariant(i)} className="p-1 text-gray-500 hover:text-red-400"><Trash2 className="w-3.5 h-3.5" /></button>
                 </div>
               ))}
@@ -427,12 +427,12 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
           </Section>
 
           {/* MODIFIERS */}
-          <Section title="Add-ons & Extras (Modifiers)">
+          <Section title={langTab === "nl" ? "Extra's & Toevoegingen" : "Add-ons & Extras (Modifiers)"}>
             <div className="space-y-2">
               {modifiers.map((m, i) => (
                 <div key={i} className="flex items-center gap-2 bg-background border border-border-default rounded-lg px-3 py-2">
                   <span className="text-sm text-white flex-1">{displayName(m)}</span>
-                  <span className="text-sm text-gray-400">{m.price ? `+&#x20AC; ${(m.price / 100).toFixed(2).replace(".", ",")}` : "Free"}</span>
+                  <span className="text-sm text-gray-400">{m.price ? `+&#x20AC; ${(m.price / 100).toFixed(2).replace(".", ",")}` : langTab === "nl" ? "Gratis" : "Free"}</span>
                   <button type="button" onClick={() => removeModifier(i)} className="p-1 text-gray-500 hover:text-red-400"><Trash2 className="w-3.5 h-3.5" /></button>
                 </div>
               ))}
@@ -453,15 +453,15 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
           </Section>
 
           {/* CATEGORIES */}
-          <Section title="Categories">
+          <Section title={langTab === "nl" ? "Categorieën" : "Categories"}>
             <div className="flex items-center justify-between mb-2">
-              {!showNewCat && <button type="button" onClick={() => setShowNewCat(true)} className="text-xs text-brand-gold hover:text-brand-gold/80 font-medium">+ New Category</button>}
+              {!showNewCat && <button type="button" onClick={() => setShowNewCat(true)} className="text-xs text-brand-gold hover:text-brand-gold/80 font-medium">{langTab === "nl" ? "+ Nieuwe categorie" : "+ New Category"}</button>}
             </div>
             {showNewCat && (
               <div className="flex gap-2 mb-3">
-                <input type="text" value={newCatName} onChange={(e) => setNewCatName(e.target.value)} placeholder="Category name" className="flex-1 bg-background border border-border-default rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-500" onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleCreateCategory(); } }} />
-                <button type="button" onClick={handleCreateCategory} disabled={creatingCat || !newCatName.trim()} className="px-3 py-2 bg-brand-red text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50">{creatingCat ? "..." : "Create"}</button>
-                <button type="button" onClick={() => { setShowNewCat(false); setNewCatName(""); }} className="px-3 py-2 text-gray-400 hover:text-white text-sm">Cancel</button>
+                <input type="text" value={newCatName} onChange={(e) => setNewCatName(e.target.value)} placeholder={langTab === "nl" ? "Categorie naam" : "Category name"} className="flex-1 bg-background border border-border-default rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-500" onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleCreateCategory(); } }} />
+                <button type="button" onClick={handleCreateCategory} disabled={creatingCat || !newCatName.trim()} className="px-3 py-2 bg-brand-red text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50">{creatingCat ? "..." : (langTab === "nl" ? "Aanmaken" : "Create")}</button>
+                <button type="button" onClick={() => { setShowNewCat(false); setNewCatName(""); }} className="px-3 py-2 text-gray-400 hover:text-white text-sm">{langTab === "nl" ? "Annuleren" : "Cancel"}</button>
               </div>
             )}
             <div className="flex flex-wrap gap-2">
@@ -470,42 +470,42 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
           </Section>
 
           {/* LOCATIONS */}
-          <Section title="Locations">
+          <Section title={langTab === "nl" ? "Locaties" : "Locations"}>
             <div className="flex flex-wrap gap-2">
               {locations.map((l) => <CheckCard key={l.id} label={l.name} checked={locationIds.includes(l.id)} onChange={() => setLocationIds((prev) => prev.includes(l.id) ? prev.filter((id) => id !== l.id) : [...prev, l.id])} />)}
             </div>
           </Section>
 
           {/* DIETARY */}
-          <Section title="Dietary & Spicy">
+          <Section title={langTab === "nl" ? "Dieet & Pittig" : "Dietary & Spicy"}>
             <div className="flex flex-wrap gap-2 mb-3">
               {DIETARY_OPTIONS.map((opt) => <CheckCard key={opt.value} label={opt.label} checked={dietaryTags.includes(opt.value)} onChange={() => setDietaryTags((prev) => prev.includes(opt.value) ? prev.filter((v) => v !== opt.value) : [...prev, opt.value])} />)}
             </div>
             <label className="flex items-center gap-2 cursor-pointer select-none">
               <input type="checkbox" checked={isSpicy} onChange={(e) => setIsSpicy(e.target.checked)} className="w-4 h-4 rounded accent-brand-red" />
-              <span className="text-sm text-gray-300">Spicy <Flame className="w-3.5 h-3.5 text-orange-400 inline ml-1" /></span>
+              <span className="text-sm text-gray-300">{langTab === "nl" ? "Pittig" : "Spicy"} <Flame className="w-3.5 h-3.5 text-orange-400 inline ml-1" /></span>
             </label>
           </Section>
 
           {/* AVAILABILITY */}
-          <Section title="Availability & Sort">
+          <Section title={langTab === "nl" ? "Beschikbaarheid & Volgorde" : "Availability & Sort"}>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-medium text-gray-400 mb-1">Sort Order</label>
+                <label className="block text-xs font-medium text-gray-400 mb-1">{langTab === "nl" ? "Sorteervolgorde" : "Sort Order"}</label>
                 <input type="number" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} className="w-full bg-background border border-border-default rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-500" />
               </div>
               <div className="flex items-end">
                 <label className="flex items-center gap-2 cursor-pointer select-none">
                   <input type="checkbox" checked={isAvailable} onChange={(e) => setIsAvailable(e.target.checked)} className="w-4 h-4 rounded accent-brand-red" />
-                  <span className="text-sm text-gray-300">Available for ordering</span>
+                  <span className="text-sm text-gray-300">{langTab === "nl" ? "Beschikbaar voor bestelling" : "Available for ordering"}</span>
                 </label>
               </div>
             </div>
           </Section>
 
           <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-sm text-gray-300 border border-border-default hover:bg-gray-700 transition-colors">Cancel</button>
-            <button type="submit" disabled={saving} className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-red hover:bg-red-700 text-white transition-colors disabled:opacity-50">{saving ? "Saving..." : editingItem ? "Update Product" : "Create Product"}</button>
+            <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-sm text-gray-300 border border-border-default hover:bg-gray-700 transition-colors">{langTab === "nl" ? "Annuleren" : "Cancel"}</button>
+            <button type="submit" disabled={saving} className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-red hover:bg-red-700 text-white transition-colors disabled:opacity-50">{saving ? "Saving..." : editingItem ? langTab === "nl" ? "Product Bijwerken" : "Update Product" : langTab === "nl" ? "Product Aanmaken" : "Create Product"}</button>
           </div>
         </form>
       </div>
