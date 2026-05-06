@@ -66,7 +66,13 @@ export default function CheckoutPage() {
       });
 
       const data = await res.json();
-      if (data.error) throw new Error(data.error);
+      if (!res.ok) {
+        // Mask internal errors; show generic message to user
+        console.error("Order API error:", data.error);
+        throw new Error(data.error && data.error.includes("Authorization")
+          ? "Payment service is not configured. Please contact the restaurant."
+          : (data.error || "Order could not be placed. Please try again."));
+      }
       if (!data.paymentUrl) throw new Error("No payment URL returned");
 
       clearCart();
