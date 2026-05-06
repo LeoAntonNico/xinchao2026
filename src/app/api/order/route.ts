@@ -48,11 +48,12 @@ export async function POST(req: Request) {
       },
     });
 
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "";
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || new URL(req.url).origin;
     const payment = await createPayment({
       amount: total,
       description: `Order ${order.id}`,
       redirectUrl: `${baseUrl}/en/order/confirmation?orderId=${order.id}`,
+      webhookUrl: process.env.MOLLIE_WEBHOOK_URL || `${baseUrl}/api/webhook/mollie`,
       metadata: { orderId: order.id },
     });
 
