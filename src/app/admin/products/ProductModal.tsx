@@ -1,22 +1,16 @@
 "use client";
 
-import type { MenuItem, Category, Location, Variant, Modifier } from "./types";
+import type { MenuItem, Category, Location, Variant, Modifier, DietaryOption } from "./types";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { X, Upload, Trash2, Plus, Flame, ChevronDown, ChevronUp } from "lucide-react";
+import { X, Upload, Trash2, Plus, Flame, Pencil, ChevronDown, ChevronUp } from "lucide-react";
 
 function check401(response: Response) {
   if (response.status === 401) { window.location.href = "/admin/login"; return true; }
   return false;
 }
 
-const DIETARY_OPTIONS = [
-  { value: "vegan", label: "Vegan" },
-  { value: "vegetarian", label: "Vegetarian" },
-  { value: "gluten-free", label: "Gluten-Free" },
-  { value: "dairy-free", label: "Dairy-Free" },
-  { value: "nut-free", label: "Nut-Free" },
-];
+
 
 const TAX_CLASSES = [
   { value: "standard", label: "Standard Rate (21%)" },
@@ -90,6 +84,14 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
   const [dietaryTags, setDietaryTags] = useState<string[]>([]);
   const [isSpicy, setIsSpicy] = useState(false);
 
+  // Dietary Options (fetched from DB)
+  const [dietaryOptions, setDietaryOptions] = useState<DietaryOption[]>([]);
+  const [editingDietaryId, setEditingDietaryId] = useState<string | null>(null);
+  const [editDietaryEn, setEditDietaryEn] = useState('');
+  const [editDietaryNl, setEditDietaryNl] = useState('');
+  const [dietaryUploading, setDietaryUploading] = useState<string | null>(null);
+  const dietaryFileRef = useRef<HTMLInputElement>(null);
+
   // Variants + Modifiers
   const [variants, setVariants] = useState<Variant[]>([]);
   const [modifiers, setModifiers] = useState<Modifier[]>([]);
@@ -108,6 +110,15 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
   const [creatingCat, setCreatingCat] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Fetch dietary options when modal opens
+  useEffect(() => {
+    if (!isOpen) return;
+    fetch("/api/admin/dietary-options", { credentials: "include" })
+      .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
+      .then((data: DietaryOption[]) => setDietaryOptions(data))
+      .catch(() => {});
+  }, [isOpen]);
 
   useEffect(() => {
     if (editingItem) {
@@ -478,13 +489,55 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
 
           {/* DIETARY */}
           <Section title={langTab === "nl" ? "Dieet & Pittig" : "Dietary & Spicy"}>
-            <div className="flex flex-wrap gap-2 mb-3">
-              {DIETARY_OPTIONS.map((opt) => <CheckCard key={opt.value} label={opt.label} checked={dietaryTags.includes(opt.value)} onChange={() => setDietaryTags((prev) => prev.includes(opt.value) ? prev.filter((v) => v !== opt.value) : [...prev, opt.value])} />)}
+            <div className="space-y-3">
+              {/* List */}
+              <div className="flex flex-wrap gap-2">
+                {dietaryOptions.map((opt) => (
+                  <div key={opt.id} className={`flex items-center gap-2 px-2 py-1.5 rounded-lg border ${dietaryTags.includes(opt.slug) ? 'bg-brand-red/20 border-brand-red/40' : 'bg-background border-border-default'}`}>
+                    <button type="button" onClick={() => setDietaryTags((prev) => prev.includes(opt.slug) ? prev.filter((v) => v !== opt.slug) : [...prev, opt.slug])} className="flex items-center gap-1.5 text-sm text-gray-200">
+                      {opt.iconUrl ? (
+                        <img src={opt.iconUrl} alt={opt.nameEn} className="w-4 h-4 object-contain"/>
+                      ) : (
+                        <div className="w-4 h-4 rounded bg-gray-700 flex items-center justify-center">
+                          <Upload className="w-2.5 h-2.5 text-gray-500"/>
+                        </div>
+                      )}
+                      {langTab === "nl" ? opt.nameNl : opt.nameEn}
+                    </button>
+                    <button type="button" onClick={() => { setEditingDietaryId(opt.id); setEditDietaryEn(opt.nameEn); setEditDietaryNl(opt.nameNl); }} className="p-0.5 text-gray-500 hover:text-brand-gold" title="Edit names">
+                      <Pencil className="w-3 h-3"/>
+                    </button>
+                    <button type="button" onClick={() => { setDietaryUploading(opt.id); dietaryFileRef.current?.click(); }} className="p-0.5 text-gray-500 hover:text-brand-gold" title="Upload icon">
+                      <Upload className="w-3 h-3"/>
+                    </button>
+                  </div>
+                ))}
+                <button type="button" onClick={async () => { const slug = prompt(langTab === "nl" ? "Slug (enkel woord, bv. vegan)" : "Slug (single word, e.g. vegan)"); if (!slug) return; const nameEn = prompt("English name") || slug; const nameNl = prompt("Dutch name") || nameEn; try { const r = await fetch("/api/admin/dietary-options", { method: "POST", credentials: "include", headers: {'Content-Type':'application/json'}, body: JSON.stringify({slug, nameEn, nameNl}) }); if (!r.ok) throw new Error(); const created = await r.json(); setDietaryOptions((prev) => [...prev, created]); } catch { alert("Failed to create"); } }} className="flex items-center gap-1 px-2 py-1.5 rounded-lg border border-dashed border-gray-600 text-sm text-gray-400 hover:text-brand-gold hover:border-brand-gold/50">
+                  <Plus className="w-3.5 h-3.5"/> {langTab === "nl" ? "Nieuwe optie" : "New option"}
+                </button>
+              </div>
+
+              {/* Inline edit form */}
+              {editingDietaryId && (
+                <div className="bg-background border border-border-default rounded-lg p-3 space-y-2">
+                  <p className="text-xs font-medium text-gray-400">{langTab === "nl" ? "Namen bewerken" : "Edit names"}</p>
+                  <div className="flex gap-2">
+                    <input type="text" value={editDietaryEn} onChange={(e) => setEditDietaryEn(e.target.value)} placeholder="English name" className="flex-1 bg-[#1a1a1a] border border-border-default rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-gray-500"/>
+                    <input type="text" value={editDietaryNl} onChange={(e) => setEditDietaryNl(e.target.value)} placeholder="Dutch name" className="flex-1 bg-[#1a1a1a] border border-border-default rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-gray-500"/>
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <button type="button" onClick={() => setEditingDietaryId(null)} className="px-3 py-1 rounded text-xs text-gray-400 border border-border-default hover:bg-gray-700">{langTab === "nl" ? "Annuleren" : "Cancel"}</button>
+                    <button type="button" onClick={async () => { try { const r = await fetch(`/api/admin/dietary-options/${encodeURIComponent(editingDietaryId)}`, { method: "PATCH", credentials: "include", headers: {'Content-Type':'application/json'}, body: JSON.stringify({nameEn: editDietaryEn, nameNl: editDietaryNl}) }); if (!r.ok) throw new Error(); setDietaryOptions((prev) => prev.map((o) => o.id === editingDietaryId ? { ...o, nameEn: editDietaryEn, nameNl: editDietaryNl } : o)); setEditingDietaryId(null); } catch { alert("Failed to save"); } }} className="px-3 py-1 rounded text-xs bg-brand-red text-white hover:bg-red-700">{langTab === "nl" ? "Opslaan" : "Save"}</button>
+                  </div>
+                </div>
+              )}
+
+              {/* Spicy toggle */}
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input type="checkbox" checked={isSpicy} onChange={(e) => setIsSpicy(e.target.checked)} className="w-4 h-4 rounded accent-brand-red"/>
+                <span className="text-sm text-gray-300">{langTab === "nl" ? "Pittig" : "Spicy"} <Flame className="w-3.5 h-3.5 text-orange-400 inline ml-1"/></span>
+              </label>
             </div>
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <input type="checkbox" checked={isSpicy} onChange={(e) => setIsSpicy(e.target.checked)} className="w-4 h-4 rounded accent-brand-red" />
-              <span className="text-sm text-gray-300">{langTab === "nl" ? "Pittig" : "Spicy"} <Flame className="w-3.5 h-3.5 text-orange-400 inline ml-1" /></span>
-            </label>
           </Section>
 
           {/* AVAILABILITY */}
@@ -502,6 +555,27 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
               </div>
             </div>
           </Section>
+
+          {/* Hidden file input for dietary icon upload */}
+          <input ref={dietaryFileRef} type="file" accept="image/*" className="hidden" onChange={async (e) => {
+            const file = e.target.files?.[0];
+            if (!file || !dietaryUploading) return;
+            const formData = new FormData();
+            formData.append("file", file);
+            try {
+              const r = await fetch("/api/admin/upload", { method: "POST", credentials: "include", body: formData });
+              if (!r.ok) throw new Error();
+              const { url } = await r.json();
+              const patchR = await fetch(`/api/admin/dietary-options/${encodeURIComponent(dietaryUploading)}`, { method: "PATCH", credentials: "include", headers: {'Content-Type':'application/json'}, body: JSON.stringify({iconUrl: url}) });
+              if (!patchR.ok) throw new Error();
+              setDietaryOptions((prev) => prev.map((o) => o.id === dietaryUploading ? { ...o, iconUrl: url } : o));
+            } catch {
+              alert("Icon upload failed");
+            } finally {
+              setDietaryUploading(null);
+              if (dietaryFileRef.current) dietaryFileRef.current.value = "";
+            }
+          }} />
 
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-sm text-gray-300 border border-border-default hover:bg-gray-700 transition-colors">{langTab === "nl" ? "Annuleren" : "Cancel"}</button>

@@ -60,6 +60,15 @@ model MenuItem {
   modifiers  ProductModifier[]
 }
 
+model DietaryOption {
+  id      String  @id @default(uuid())
+  slug    String  @unique // e.g. "vegan", "gluten-free"
+  nameEn  String
+  nameNl  String
+  iconUrl String? // uploaded icon image
+  sortOrder Int   @default(0)
+}
+
 model ProductVariant {
   id        String  @id @default(uuid())
   name      String

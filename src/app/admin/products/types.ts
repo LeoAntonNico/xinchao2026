@@ -1,4 +1,5 @@
 export interface Category { id: string; name: string; }
+export interface DietaryOption { id: string; slug: string; nameEn: string; nameNl: string; iconUrl: string | null; sortOrder: number; }
 export interface Location { id: string; name: string; }
 export interface Variant { id: string; name: string; nameNl: string | null; price: number; sortOrder: number; }
 export interface Modifier { id: string; name: string; nameNl: string | null; price: number; sortOrder: number; }

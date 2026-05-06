@@ -8,6 +8,7 @@ const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
+  await prisma.dietaryOption.deleteMany();
   await prisma.productModifier.deleteMany();
   await prisma.productVariant.deleteMany();
   await prisma.orderItem.deleteMany();
@@ -17,6 +18,18 @@ async function main() {
   await prisma.menuItem.deleteMany();
   await prisma.menuCategory.deleteMany();
   await prisma.location.deleteMany();
+
+  console.log("Seeding dietary options...");
+  const dietarySeed = [
+    { slug: "vegan", nameEn: "Vegan", nameNl: "Veganistisch", sortOrder: 1 },
+    { slug: "vegetarian", nameEn: "Vegetarian", nameNl: "Vegetarisch", sortOrder: 2 },
+    { slug: "gluten-free", nameEn: "Gluten-Free", nameNl: "Glutenvrij", sortOrder: 3 },
+    { slug: "dairy-free", nameEn: "Dairy-Free", nameNl: "Zuivelvrij", sortOrder: 4 },
+    { slug: "nut-free", nameEn: "Nut-Free", nameNl: "Notenvrij", sortOrder: 5 },
+  ];
+  for (const d of dietarySeed) {
+    await prisma.dietaryOption.create({ data: d });
+  }
 
   console.log("Seeding locations...");
   const utrecht = await prisma.location.create({
