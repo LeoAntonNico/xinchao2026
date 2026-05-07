@@ -14,15 +14,37 @@ export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const body = await request.json();
-  const { name, slug, sortOrder } = body;
-  if (!name) return NextResponse.json({ error: "Name required" }, { status: 400 });
+  try {
+    const body = await request.json();
+    const { name, slug, sortOrder } = body;
+    if (!name) return NextResponse.json({ error: "Name required" }, { status: 400 });
 
-  const generatedSlug = slug || name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-  const item = await prisma.menuCategory.create({
-    data: { name, slug: generatedSlug, sortOrder: sortOrder ?? 0 },
-  });
-  return NextResponse.json(item);
+    let generatedSlug = slug || name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+    if (!generatedSlug) {
+      generatedSlug = name.toLowerCase().replace(/\s+/g, "-").replace(/[^\w-]/g, "");
+    }
+    if (!generatedSlug) {
+      generatedSlug = crypto.randomUUID().slice(0, 8); // fallback for fully non-ASCII names
+    }
+
+    // Handle duplicate slug by appending a random suffix
+    let finalSlug = generatedSlug;
+    let attempts = 0;
+    while (attempts++ < 10) {
+      const existing = await prisma.menuCategory.findUnique({ where: { slug: finalSlug }, select: { id: true } });
+      if (!existing) break;
+      finalSlug = `${generatedSlug}-${Math.random().toString(36).slice(2, 6)}`;
+    }
+
+    const item = await prisma.menuCategory.create({
+      data: { name, slug: finalSlug, sortOrder: sortOrder ?? 0 },
+    });
+    return NextResponse.json(item);
+  } catch (e: unknown) {
+    console.error("Category POST error:", e);
+    const msg = e instanceof Error ? e.message : "Server error";
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
 }
 
 export async function DELETE(request: NextRequest) {

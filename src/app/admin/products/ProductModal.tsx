@@ -179,7 +179,7 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
         body: JSON.stringify({ name: newCatName.trim(), sortOrder: categories.length + 1 }),
       });
       if (check401(res)) return;
-      if (!res.ok) { setErrors(["Category create failed"]); return; }
+      if (!res.ok) { const err = await res.json().catch(() => ({})); setErrors([err.error || "Category create failed"]); return; }
       const cat = await res.json();
       onCategoryCreated?.(cat);
       setCategoryIds((prev) => [...prev, cat.id]);
@@ -246,7 +246,7 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
         credentials: "include", body: JSON.stringify(payload),
       });
       if (check401(res)) return;
-      if (!res.ok) throw new Error("Save failed");
+      if (!res.ok) { const errData = await res.json().catch(() => ({})); throw new Error(errData.error || "Save failed"); }
       const item: MenuItem = await res.json();
 
       // Save variants + modifiers
