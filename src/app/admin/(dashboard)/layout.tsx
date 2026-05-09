@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getServerSession } from "next-auth/next";
-import { Package, CalendarCheck, LayoutDashboard, ShoppingBag } from "lucide-react";
+import { Package, CalendarCheck, LayoutDashboard, ShoppingBag, Printer } from "lucide-react";
 import { LogoutButton } from "@/components/admin/LogoutButton";
 import { authOptions } from "@/lib/auth";
 
@@ -13,6 +13,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     { href: "/admin/products", label: "Products", icon: ShoppingBag },
     { href: "/admin/orders", label: "Orders", icon: Package },
     { href: "/admin/reservations", label: "Reservations", icon: CalendarCheck },
+    { href: "/admin/print", label: "Print Test", icon: Printer },
   ];
 
   return (

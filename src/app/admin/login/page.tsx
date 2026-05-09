@@ -2,7 +2,15 @@
 
 import { signIn } from "next-auth/react";
 import { useState } from "react";
-import { Lock } from "lucide-react";
+
+function LockIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <rect x="3" y="11" width="18" height="11" rx="0" ry="0" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </svg>
+  );
+}
 
 export default function AdminLoginPage() {
   const [username, setUsername] = useState("");
@@ -28,43 +36,71 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-4">
-      <div className="w-full max-w-sm bg-sidebar border border-border-default rounded-xl p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <Lock className="w-8 h-8 text-brand-gold" />
-          <h1 className="text-xl font-bold text-brand-gold tracking-wider">
-            ADMIN LOGIN
-          </h1>
+    <div className="min-h-screen bg-[#0f0f0f] flex flex-col">
+      {/* Top bar */}
+      <header className="w-full border-b border-white/5">
+        <div className="px-6 py-3">
+          <span className="text-[13px] tracking-[0.12em] uppercase font-bold text-brand-gold font-mono">
+            Xin Chào Admin
+          </span>
         </div>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">Username</label>
-            <input
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="w-full rounded-lg bg-background border border-border-default px-3 py-2 text-white focus:outline-none focus:border-brand-gold"
-              required
-            />
+      </header>
+
+      {/* Main content */}
+      <div className="flex-1 flex">
+        {/* Left spacer */}
+        <div className="hidden lg:block lg:w-[45%]" />
+
+        {/* Login form card */}
+        <div className="flex-1 flex items-center justify-center lg:justify-start px-6 py-12">
+          <div className="w-full max-w-[380px] bg-[#1a1a1a] border border-white/8 p-8">
+            {/* Form header */}
+            <div className="flex items-center gap-3 mb-8">
+              <LockIcon className="w-7 h-7 text-brand-gold" />
+              <h1 className="text-[15px] tracking-[0.1em] uppercase font-bold text-brand-gold font-mono">
+                Admin Login
+              </h1>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div>
+                <label className="block text-[12px] text-gray-500 mb-2 tracking-wide uppercase font-mono">
+                  Username
+                </label>
+                <input
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="w-full bg-[#131313] border border-white/15 px-3 py-2.5 text-[14px] text-white focus:outline-none focus:border-brand-gold transition-colors"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-[12px] text-gray-500 mb-2 tracking-wide uppercase font-mono">
+                  Password
+                </label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full bg-[#131313] border border-white/15 px-3 py-2.5 text-[14px] text-white focus:outline-none focus:border-brand-gold transition-colors"
+                  required
+                />
+              </div>
+
+              {error && (
+                <p className="text-brand-red text-[13px] font-medium">{error}</p>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-brand-red hover:bg-[#a01830] text-white text-[13px] font-bold tracking-[0.08em] uppercase px-4 py-3 transition-colors disabled:opacity-50 font-mono"
+              >
+                {loading ? "Signing in..." : "Sign In"}
+              </button>
+            </form>
           </div>
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-lg bg-background border border-border-default px-3 py-2 text-white focus:outline-none focus:border-brand-gold"
-              required
-            />
-          </div>
-          {error && <p className="text-brand-red text-sm">{error}</p>}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-brand-red hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
-          >
-            {loading ? "Signing in..." : "Sign In"}
-          </button>
-        </form>
+        </div>
       </div>
     </div>
   );

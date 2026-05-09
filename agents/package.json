@@ -1,0 +1,14 @@
+{
+  "name": "xinchao-printer-agent",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local print agent for Epson TM-T20III at Xin Chao branches",
+  "main": "printer-agent.js",
+  "scripts": {
+    "start": "node printer-agent.js",
+    "dev": "node -r dotenv/config printer-agent.js"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2"
+  }
+}

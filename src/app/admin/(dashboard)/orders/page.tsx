@@ -160,6 +160,21 @@ export default function OrdersPage() {
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-1">
+                      <button
+                        onClick={async () => {
+                          const res = await fetch("/api/print-queue", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            credentials: "include",
+                            body: JSON.stringify({ orderId: order.id, location: order.location.name.toLowerCase() }),
+                          });
+                          if (res.ok) fetchOrders();
+                        }}
+                        title="Print receipt"
+                        className="px-2 py-1 rounded text-xs border border-gray-600 text-gray-300 hover:bg-gray-700 transition-colors"
+                      >
+                        Print
+                      </button>
                       {cfg.next && (
                         <button
                           onClick={() => advanceStatus(order.id, cfg.next!)}

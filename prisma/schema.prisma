@@ -15,6 +15,9 @@ model Location {
   email       String?
   openTime    String
   closeTime   String
+  openingHours Json? // { "monday": { "open": "12:00", "close": "20:00" }, ... }
+  welcomeTextNl String?
+  welcomeTextEn String?
   capacity    Int
   mapEmbedUrl String?
   createdAt   DateTime @default(now())
@@ -154,6 +157,27 @@ model Reservation {
 
   locationId String
   location   Location @relation(fields: [locationId], references: [id])
+}
+
+model PrintJob {
+  id          String      @id @default(cuid())
+  orderId     String?
+  location    String      // "utrecht" | "wageningen"
+  payload     Json        // receipt data template
+  escposData  String?     // pre-rendered ESC/POS base64
+  status      PrintStatus @default(PENDING)
+  printedAt   DateTime?
+  attemptCount Int        @default(0)
+  lastError   String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+enum PrintStatus {
+  PENDING
+  PRINTED
+  FAILED
+  RETRYING
 }
 
 enum OrderStatus {

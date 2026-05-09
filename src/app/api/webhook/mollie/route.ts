@@ -49,6 +49,18 @@ export async function POST(req: Request) {
       }).catch(console.error);
     }
 
+    // Enqueue print job for the location's printer
+    if (orderStatus === "PAID") {
+      await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3002'}/api/print-queue`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId: order.id,
+          location: order.location.slug,
+        }),
+      }).catch((err) => console.error('Print queue error:', err));
+    }
+
     return NextResponse.json({ status: "ok" });
   } catch (e: unknown) {
     console.error("Webhook error:", e);

@@ -1,26 +1,53 @@
 @import "tailwindcss";
 
 @theme inline {
-  --color-background: #1a1a1a;
+  /* Legacy tokens (backward compat) */
+  --color-background: #0a0a0a;
   --color-foreground: #ededed;
-  --color-sidebar: #252525;
+  --color-sidebar: #1a1a1a;
   --color-brand-red: #c41e3a;
   --color-brand-gold: #d4a017;
   --color-ghost-border: rgba(255,255,255,0.3);
   --color-border-default: #333;
 
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* New brutalist/neon design system */
+  --color-surface: #131313;
+  --color-surface-bright: #393939;
+  --color-surface-container: #1f1f1f;
+  --color-surface-container-high: #2a2a2a;
+  --color-on-surface: #e2e2e2;
+  --color-on-surface-variant: #e6bcbd;
+  --color-outline: #ad8888;
+  --color-outline-variant: #5d3f40;
+
+  --color-neon-pink: #FF2D55;
+  --color-neon-pink-container: #ff5167;
+  --color-lime: #A4D037;
+  --color-lime-container: #7da600;
+  --color-soul-red: #FF0000;
+
+  --color-primary: #ffb3b5;
+  --color-secondary: #a9d63c;
+  --color-tertiary: #ffb4a8;
+
+  --font-sans: var(--font-be-vietnam), 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: var(--font-space-grotesk), monospace;
+  --font-display: var(--font-anton), Impact, sans-serif;
 }
 
 body {
-  background: var(--color-background);
-  color: var(--color-foreground);
-  font-family: 'Helvetica Neue', Arial, sans-serif;
+  background: var(--color-surface);
+  color: var(--color-on-surface);
+  font-family: var(--font-sans);
 }
 
 @layer base {
   html {
     scrollbar-gutter: stable;
+  }
+
+  /* Sharp corners everywhere - brutalist shape language */
+  *, *::before, *::after {
+    border-radius: 0 !important;
   }
 }
