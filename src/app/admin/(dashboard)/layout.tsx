@@ -18,7 +18,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <div className="min-h-screen bg-background">
-      <nav className="bg-sidebar border-b border-border-default px-6 py-3">
+      <nav className="bg-white border-b border-border-default px-6 py-3">
         <div className="flex items-center gap-6 max-w-7xl mx-auto">
           <Link href="/admin" className="font-bold text-brand-gold tracking-wider">
             XIN CHÀO ADMIN
@@ -33,7 +33,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
                     <Link
                       key={link.href}
                       href={link.href}
-                      className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
+                      className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-500 hover:bg-gray-200 hover:text-foreground transition-colors"
                     >
                       <Icon className="w-4 h-4" />
                       {link.label}
@@ -50,7 +50,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           ) : (
             <>
               <div className="flex-1" />
-              <Link href="/en" className="text-sm text-gray-400 hover:text-white transition-colors">
+              <Link href="/en" className="text-sm text-gray-400 hover:text-foreground transition-colors">
                 Back to site →
               </Link>
             </>

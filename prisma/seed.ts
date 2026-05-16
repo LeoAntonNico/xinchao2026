@@ -121,12 +121,27 @@ async function main() {
 
   console.log("Seeding pickup slots...");
   const today = new Date();
+
+  // Generate 15-minute interval times from 12:00 to 20:00
+  function generateQuarterHourSlots() {
+    const slots: string[] = [];
+    for (let h = 12; h < 20; h++) {
+      for (let m = 0; m < 60; m += 15) {
+        slots.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
+      }
+    }
+    // Add 20:00 as the last slot
+    slots.push("20:00");
+    return slots;
+  }
+
+  const times = generateQuarterHourSlots();
+
   for (let day = 1; day <= 7; day++) {
     const date = new Date(today);
     date.setDate(today.getDate() + day);
     const dateStr = date.toISOString().split("T")[0];
 
-    const times = ["12:00", "12:30", "13:00", "13:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00"];
     for (const time of times) {
       await prisma.pickupSlot.create({
         data: {

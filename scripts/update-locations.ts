@@ -12,7 +12,7 @@ const utrechtHours = {
   tuesday:   { open: "12:00", close: "20:00" },
   wednesday: { open: "12:00", close: "20:00" },
   thursday:  { open: "12:00", close: "20:00" },
-  friday:    { open: "12:00", close: "20:00" },
+  friday:    { open: "12:00", close: "21:00" },
   saturday:  { open: "12:00", close: "20:00" },
   sunday:    { open: "14:00", close: "20:00" },
 };
@@ -22,7 +22,7 @@ const wagenHours = {
   tuesday:   { open: "12:00", close: "19:30" },
   wednesday: { open: "12:00", close: "19:30" },
   thursday:  { open: "12:00", close: "19:30" },
-  friday:    { open: "12:00", close: "19:30" },
+  friday:    { open: "12:00", close: "20:00" },
   saturday:  { open: "12:00", close: "19:30" },
   sunday:    { open: "14:00", close: "19:30" },
 };

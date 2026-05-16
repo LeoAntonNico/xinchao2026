@@ -1,0 +1,1 @@
+UPDATE "Location" SET "mapEmbedUrl" = 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2451.3926136781292!2d5.1136777770305235!3d52.09078587195181!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x47c66fa24b658581%3A0x32bba420f8104178!2sXin%20Ch%C3%A0o%20Utrecht%20-%20Saigon%20Street%20Food!5e0!3m2!1sen!2sus!4v1778598915866!5m2!1sen!2sus' WHERE name ILIKE '%utrecht%';

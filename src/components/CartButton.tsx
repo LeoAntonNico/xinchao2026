@@ -11,7 +11,7 @@ export default function CartButton() {
   return (
     <button
       onClick={() => setIsOpen(true)}
-      className="fixed bottom-6 right-6 z-50 p-3 bg-sidebar border border-border-default rounded-full text-white hover:bg-gray-700 transition-colors shadow-lg"
+      className="hidden lg:flex fixed bottom-6 right-6 z-50 p-3 bg-sidebar border border-border-default rounded-full text-foreground hover:bg-surface-container transition-colors shadow-lg"
       aria-label="Open cart"
     >
       <div className="relative">

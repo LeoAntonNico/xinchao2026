@@ -4,7 +4,8 @@ import { useState, useEffect } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import {
   MapPin, Calendar, Clock, Users, CheckCircle,
-  AlertCircle, ArrowRight, Info
+  AlertCircle, ArrowRight, Info, Phone, Mail, User, MessageSquare,
+  Utensils
 } from "lucide-react";
 
 interface Location {
@@ -12,6 +13,8 @@ interface Location {
   name: string;
   slug: string;
   address?: string;
+  openTime?: string;
+  closeTime?: string;
 }
 
 interface Availability {
@@ -53,7 +56,39 @@ export default function ReservePage() {
       .catch(() => setAvail(null));
   }, [form.locationId, form.date]);
 
-  const times = ["12:00", "12:30", "13:00", "17:00", "18:00", "18:30", "19:30", "20:00"];
+  const selectedLocation = locations.find((l) => l.id === form.locationId);
+
+  /* Generate 30-minute time slots from open → close, filtering out past times for today */
+  const times = (() => {
+    const slots: string[] = [];
+    const open = selectedLocation?.openTime;
+    const close = selectedLocation?.closeTime;
+    if (!open || !close) return slots;
+
+    const [oh, om] = open.split(":").map(Number);
+    const [ch, cm] = close.split(":").map(Number);
+    let h = oh;
+    let m = om;
+
+    while (h < ch || (h === ch && m <= cm)) {
+      slots.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
+      m += 30;
+      if (m >= 60) { m = 0; h += 1; }
+    }
+
+    /* If selected date is today, hide times that have already passed */
+    const today = new Date().toISOString().split("T")[0];
+    if (form.date === today) {
+      const now = new Date();
+      const nowMinutes = now.getHours() * 60 + now.getMinutes();
+      return slots.filter((t) => {
+        const [th, tm] = t.split(":").map(Number);
+        const slotMinutes = th * 60 + tm;
+        return slotMinutes > nowMinutes;
+      });
+    }
+    return slots;
+  })();
 
   const getAvailable = (time: string) => {
     if (!avail) return null;
@@ -93,16 +128,15 @@ export default function ReservePage() {
   return (
     <div className="px-6 md:px-10 py-8">
       {/* ═══════ HEADER ═══════ */}
-      <div className="mb-10">
+      <div className="mb-12">
         <h1 className="font-display text-[42px] md:text-[64px] leading-[0.9] uppercase tracking-tight">
-          <span className="text-white">{isNl ? "RESERVEER EEN" : "RESERVE A"}</span>{" "}
-          <span className="text-lime">{isNl ? "TAFEL" : "TABLE"}</span>
+          <span className="text-foreground">{isNl ? "RESERVEER EEN" : "RESERVE A"}</span>{" "}
+          <span className="text-logo-red">{isNl ? "TAFEL" : "TABLE"}</span>
         </h1>
-        <p className="text-neon-pink text-[12px] font-mono uppercase tracking-[0.12em] mt-3 max-w-xl">
+        <p className="text-gray-500 text-[13px] font-mono uppercase tracking-[0.12em] mt-3 whitespace-nowrap">
           {isNl
-            ? "Zeker je plek in het hart van de straatvoedsel chaos. Echte smaak. Geen compromis."
-            : "Secure your spot at the heart of the street food chaos. Real flavor. No compromise."}{" "}
-          <span className="text-brand-red font-bold">SOUL</span>
+            ? "Reserveer je tafel bij Xin Chào."
+            : "Reserve your table at Xin Chào."}
         </p>
       </div>
 
@@ -110,8 +144,8 @@ export default function ReservePage() {
       {message && (
         <div className={`mb-6 border-l-[4px] px-4 py-3 text-[12px] font-mono uppercase tracking-wide ${
           message.type === "success"
-            ? "border-lime bg-lime/10 text-lime"
-            : "border-neon-pink bg-neon-pink/10 text-neon-pink"
+            ? "border-logo-red bg-logo-red/10 text-logo-red"
+            : "border-logo-red bg-logo-red/10 text-logo-red"
         }`}>
           <div className="flex items-center gap-2">
             {message.type === "success" ? <CheckCircle className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
@@ -120,51 +154,54 @@ export default function ReservePage() {
         </div>
       )}
 
-      <div className="flex flex-col lg:flex-row gap-8">
+      <div className="flex flex-col lg:flex-row gap-10">
         {/* ═══════ LEFT COLUMN — FORM ═══════ */}
-        <div className="flex-1 min-w-0 space-y-10">
-          <form onSubmit={handleSubmit} className="space-y-10">
+        <div className="flex-1 min-w-0 space-y-12">
+          <form onSubmit={handleSubmit} className="space-y-12">
 
             {/* ── Booking Details ── */}
             <section>
-              <div className="flex items-baseline justify-between mb-5">
+              <div className="flex items-baseline justify-between mb-6">
                 <div className="flex items-center gap-3">
-                  <div className="w-1.5 h-7 bg-neon-pink shrink-0" />
-                  <h2 className="font-display text-[22px] uppercase italic tracking-tight text-white">
+                  <div className="w-7 h-7 bg-logo-red text-white flex items-center justify-center text-[13px] font-bold font-mono shrink-0">
+                    1
+                  </div>
+                  <h2 className="font-display text-[20px] uppercase tracking-tight text-foreground">
                     {isNl ? "Boekingsdetails" : "Booking Details"}
                   </h2>
                 </div>
-                <span className="font-mono text-[10px] text-gray-600 uppercase tracking-[0.1em]">
-                  Booking_info
-                </span>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-5">
                 {/* Location */}
-                <div className="space-y-1.5">
-                  <label className="font-mono text-[10px] text-neon-pink uppercase tracking-[0.1em] flex items-center gap-1.5">
-                    <MapPin className="w-3 h-3" />
-                    {isNl ? "Selecteer Locatie" : "Select Location"}
+                <div className="space-y-2">
+                  <label className="font-mono text-[11px] text-gray-400 uppercase tracking-[0.1em] flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5" />
+                    {isNl ? "Locatie" : "Location"}
                   </label>
-                  <select
-                    value={form.locationId}
-                    onChange={(e) => setForm({ ...form, locationId: e.target.value, time: "" })}
-                    required
-                    className="w-full px-4 py-3 bg-surface-container border border-white/10 text-white text-[14px] focus:border-neon-pink focus:outline-none transition-colors appearance-none"
-                    style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 6L11 1' stroke='%23666' stroke-width='1.5'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 16px center" }}
-                  >
-                    <option value="">{isNl ? "Kies een locatie" : "Choose a location"}</option>
-                    {locations.map((loc) => (
-                      <option key={loc.id} value={loc.id}>{loc.name}</option>
-                    ))}
-                  </select>
+                  <div className="relative">
+                    <select
+                      value={form.locationId}
+                      onChange={(e) => setForm({ ...form, locationId: e.target.value, time: "" })}
+                      required
+                      className="w-full px-4 py-3.5 bg-white border border-gray-200 text-foreground text-[14px] focus:border-logo-red focus:outline-none transition-colors appearance-none"
+                    >
+                      <option value="">{isNl ? "Kies een locatie" : "Choose a location"}</option>
+                      {locations.map((loc) => (
+                        <option key={loc.id} value={loc.id}>{loc.name}</option>
+                      ))}
+                    </select>
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                      <ChevronDownIcon />
+                    </div>
+                  </div>
                 </div>
 
                 {/* Date + Party Size */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="font-mono text-[10px] text-neon-pink uppercase tracking-[0.1em] flex items-center gap-1.5">
-                      <Calendar className="w-3 h-3" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  <div className="space-y-2">
+                    <label className="font-mono text-[11px] text-gray-400 uppercase tracking-[0.1em] flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5" />
                       {isNl ? "Datum" : "Date"}
                     </label>
                     <input
@@ -173,33 +210,41 @@ export default function ReservePage() {
                       min={new Date().toISOString().split("T")[0]}
                       onChange={(e) => setForm({ ...form, date: e.target.value, time: "" })}
                       required
-                      className="w-full px-4 py-3 bg-surface-container border border-white/10 text-white text-[14px] focus:border-neon-pink focus:outline-none transition-colors placeholder:text-gray-600"
+                      className="w-full px-4 py-3.5 bg-white border border-gray-200 text-foreground text-[14px] focus:border-logo-red focus:outline-none transition-colors placeholder:text-gray-400"
                     />
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="font-mono text-[10px] text-neon-pink uppercase tracking-[0.1em] flex items-center gap-1.5">
-                      <Users className="w-3 h-3" />
-                      {isNl ? "Groepsgrootte" : "Party Size"}
+                  <div className="space-y-2">
+                    <label className="font-mono text-[11px] text-gray-400 uppercase tracking-[0.1em] flex items-center gap-1.5">
+                      <Users className="w-3.5 h-3.5" />
+                      {isNl ? "Aantal personen" : "Party Size"}
                     </label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={20}
-                      value={form.partySize}
-                      onChange={(e) => setForm({ ...form, partySize: Math.min(20, Math.max(1, parseInt(e.target.value) || 1)) })}
-                      required
-                      className="w-full px-4 py-3 bg-surface-container border border-white/10 text-white text-[14px] focus:border-neon-pink focus:outline-none transition-colors"
-                    />
+                    <div className="relative">
+                      <select
+                        value={form.partySize}
+                        onChange={(e) => setForm({ ...form, partySize: parseInt(e.target.value) || 1 })}
+                        required
+                        className="w-full px-4 py-3.5 bg-white border border-gray-200 text-foreground text-[14px] focus:border-logo-red focus:outline-none transition-colors appearance-none"
+                      >
+                        {Array.from({ length: 20 }, (_, i) => i + 1).map((n) => (
+                          <option key={n} value={n}>
+                            {n} {isNl ? (n === 1 ? "persoon" : "personen") : (n === 1 ? "person" : "people")}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                        <ChevronDownIcon />
+                      </div>
+                    </div>
                   </div>
                 </div>
 
                 {/* Preferred Time */}
-                <div className="space-y-2">
-                  <label className="font-mono text-[10px] text-neon-pink uppercase tracking-[0.1em] flex items-center gap-1.5">
-                    <Clock className="w-3 h-3" />
+                <div className="space-y-3">
+                  <label className="font-mono text-[11px] text-gray-400 uppercase tracking-[0.1em] flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5" />
                     {isNl ? "Voorkeurstijd" : "Preferred Time"}
                   </label>
-                  <div className="grid grid-cols-4 gap-2">
+                  <div className="grid grid-cols-4 gap-2.5">
                     {times.map((t) => {
                       const seats = getAvailable(t);
                       const isFull = seats !== null && seats <= 0;
@@ -212,63 +257,58 @@ export default function ReservePage() {
                           onClick={() => setForm({ ...form, time: t })}
                           className={`relative py-3 border text-[12px] font-bold font-mono uppercase tracking-wide transition-all ${
                             selected
-                              ? "bg-lime text-black border-lime"
+                              ? "bg-logo-red text-white border-logo-red"
                               : isFull
-                                ? "border-white/5 text-gray-600 cursor-not-allowed line-through"
-                                : "border-white/10 text-white hover:border-white/25 hover:bg-white/[0.02]"
+                                ? "border-gray-100 text-gray-300 cursor-not-allowed line-through"
+                                : "border-gray-200 text-foreground hover:border-logo-red hover:text-logo-red"
                           }`}
                         >
                           {t}
-                          {seats !== null && seats > 0 && (
-                            <span className={`absolute -top-1.5 -right-1.5 w-5 h-5 flex items-center justify-center text-[9px] ${
-                              seats > 5 ? "bg-lime text-black" : seats > 0 ? "bg-neon-pink text-black" : "bg-gray-700 text-gray-400"
-                            }`}>
-                              {seats}
-                            </span>
-                          )}
                         </button>
                       );
                     })}
                   </div>
-                  {avail && (
-                    <p className="text-[10px] text-gray-600 font-mono mt-1">
-                      {isNl ? "Aantal vrije plekken per tijdslot" : "Remaining seats per time slot"}
+                  <div className="flex items-center gap-1.5 text-gray-400">
+                    <Info className="w-3 h-3" />
+                    <p className="text-[10px] font-mono uppercase tracking-wider">
+                      {isNl ? "Reserveringen worden automatisch geannuleerd als ze 10 minuten over de verwachte tijd zijn" : "Reservations will be canceled automatically if it's 10 mins over the expected time"}
                     </p>
-                  )}
+                  </div>
                 </div>
               </div>
             </section>
 
             {/* ── Contact Information ── */}
             <section>
-              <div className="flex items-baseline justify-between mb-5">
+              <div className="flex items-baseline justify-between mb-6">
                 <div className="flex items-center gap-3">
-                  <div className="w-1.5 h-7 bg-lime shrink-0" />
-                  <h2 className="font-display text-[22px] uppercase italic tracking-tight text-white">
+                  <div className="w-7 h-7 bg-logo-red text-white flex items-center justify-center text-[13px] font-bold font-mono shrink-0">
+                    2
+                  </div>
+                  <h2 className="font-display text-[20px] uppercase tracking-tight text-foreground">
                     {isNl ? "Contactgegevens" : "Contact Information"}
                   </h2>
                 </div>
-                <span className="font-mono text-[10px] text-gray-600 uppercase tracking-[0.1em]">
-                  Contact_info
-                </span>
               </div>
 
-              <div className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="font-mono text-[10px] text-lime uppercase tracking-[0.1em]">
+              <div className="space-y-5">
+                <div className="space-y-2">
+                  <label className="font-mono text-[11px] text-gray-400 uppercase tracking-[0.1em] flex items-center gap-1.5">
+                    <User className="w-3.5 h-3.5" />
                     {isNl ? "Volledige naam" : "Full Name"}
                   </label>
                   <input
                     required
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    placeholder={isNl ? "WIE BEN JIJ?" : "WHO ARE YOU?"}
-                    className="w-full px-4 py-3 bg-surface-container border border-white/10 text-white text-[14px] placeholder:text-gray-600 focus:border-lime focus:outline-none transition-colors"
+                    placeholder={isNl ? "Je naam" : "Your name"}
+                    className="w-full px-4 py-3.5 bg-white border border-gray-200 text-foreground text-[14px] placeholder:text-gray-400 focus:border-logo-red focus:outline-none transition-colors"
                   />
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="font-mono text-[10px] text-lime uppercase tracking-[0.1em]">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  <div className="space-y-2">
+                    <label className="font-mono text-[11px] text-gray-400 uppercase tracking-[0.1em] flex items-center gap-1.5">
+                      <Phone className="w-3.5 h-3.5" />
                       {isNl ? "Telefoonnummer" : "Phone Number"}
                     </label>
                     <input
@@ -277,19 +317,20 @@ export default function ReservePage() {
                       value={form.phone}
                       onChange={(e) => setForm({ ...form, phone: e.target.value })}
                       placeholder="+31 6 12345678"
-                      className="w-full px-4 py-3 bg-surface-container border border-white/10 text-white text-[14px] placeholder:text-gray-600 focus:border-lime focus:outline-none transition-colors"
+                      className="w-full px-4 py-3.5 bg-white border border-gray-200 text-foreground text-[14px] placeholder:text-gray-400 focus:border-logo-red focus:outline-none transition-colors"
                     />
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="font-mono text-[10px] text-lime uppercase tracking-[0.1em]">
+                  <div className="space-y-2">
+                    <label className="font-mono text-[11px] text-gray-400 uppercase tracking-[0.1em] flex items-center gap-1.5">
+                      <Mail className="w-3.5 h-3.5" />
                       {isNl ? "E-mailadres" : "Email Address"}
                     </label>
                     <input
                       type="email"
                       value={form.email}
                       onChange={(e) => setForm({ ...form, email: e.target.value })}
-                      placeholder="hello@streetfood.vn"
-                      className="w-full px-4 py-3 bg-surface-container border border-white/10 text-white text-[14px] placeholder:text-gray-600 focus:border-lime focus:outline-none transition-colors"
+                      placeholder="hello@xinchao.nl"
+                      className="w-full px-4 py-3.5 bg-white border border-gray-200 text-foreground text-[14px] placeholder:text-gray-400 focus:border-logo-red focus:outline-none transition-colors"
                     />
                   </div>
                 </div>
@@ -298,23 +339,27 @@ export default function ReservePage() {
 
             {/* ── Special Requests ── */}
             <section>
-              <div className="flex items-baseline justify-between mb-5">
+              <div className="flex items-baseline justify-between mb-6">
                 <div className="flex items-center gap-3">
-                  <div className="w-1.5 h-7 bg-lime shrink-0" />
-                  <h2 className="font-display text-[22px] uppercase italic tracking-tight text-white">
+                  <div className="w-7 h-7 bg-logo-red text-white flex items-center justify-center text-[13px] font-bold font-mono shrink-0">
+                    3
+                  </div>
+                  <h2 className="font-display text-[20px] uppercase tracking-tight text-foreground">
                     {isNl ? "Speciale Verzoeken" : "Special Requests"}
                   </h2>
                 </div>
               </div>
-              <div className="space-y-1.5">
-                <label className="font-mono text-[10px] text-neon-pink uppercase tracking-[0.1em]">
+              <div className="space-y-2">
+                <label className="font-mono text-[11px] text-gray-400 uppercase tracking-[0.1em] flex items-center gap-1.5">
+                  <MessageSquare className="w-3.5 h-3.5" />
                   {isNl ? "Opmerkingen (allergieën, verjaardagen, etc.)" : "Notes (allergies, birthdays, etc.)"}
                 </label>
                 <textarea
                   value={form.notes}
                   onChange={(e) => setForm({ ...form, notes: e.target.value })}
                   rows={4}
-                  className="w-full px-4 py-3 bg-surface-container border border-white/10 text-white text-[14px] placeholder:text-gray-600 focus:border-lime focus:outline-none transition-colors resize-none"
+                  placeholder={isNl ? "Laat het ons weten..." : "Let us know..."}
+                  className="w-full px-4 py-3.5 bg-white border border-gray-200 text-foreground text-[14px] placeholder:text-gray-400 focus:border-logo-red focus:outline-none transition-colors resize-none"
                 />
               </div>
             </section>
@@ -323,7 +368,7 @@ export default function ReservePage() {
             <button
               type="submit"
               disabled={loading || !form.time}
-              className="w-full py-5 bg-lime text-black font-bold text-[15px] tracking-[0.06em] uppercase hover:brightness-110 transition-all disabled:opacity-40 flex items-center justify-center gap-2"
+              className="w-full py-5 bg-logo-red text-white font-bold text-[15px] tracking-[0.06em] uppercase hover:bg-logo-red-hover transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-3"
             >
               {loading
                 ? (isNl ? "Bezig..." : "Processing...")
@@ -336,56 +381,89 @@ export default function ReservePage() {
         </div>
 
         {/* ═══════ RIGHT COLUMN — SIDEBAR ═══════ */}
-        <div className="w-full lg:w-[360px] shrink-0 space-y-6">
-          {/* Urban Vibes card */}
-          <div className="border-t-[3px] border-neon-pink bg-surface-container">
-            <div className="p-5 space-y-4">
-              <h3 className="font-display text-[18px] uppercase tracking-tight text-neon-pink">
-                {isNl ? "Stedelijke Sfeer" : "Urban Vibes"}
-              </h3>
-              <p className="text-[13px] text-gray-400 leading-relaxed">
-                {isNl
-                  ? "Onze locaties zijn ontworpen voor de snelle energie van de straat. Reserveringen worden 15 minuten na je boekingstijd vastgehouden."
-                  : "Our locations are designed for the fast-paced energy of the street. Reservations are held for 15 minutes past your booking time."}
-              </p>
-              <div className="relative aspect-[4/3] overflow-hidden bg-surface">
-                <img
-                  src="/images/hero-pho.jpg"
-                  alt="Restaurant"
-                  className="w-full h-full object-cover grayscale"
-                />
-              </div>
-              <div className="flex items-center gap-6 text-[11px] font-mono uppercase tracking-wide">
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-500">Status</span>
-                  <span className="text-lime font-bold">{isNl ? "OPEN" : "OPEN NOW"}</span>
+        <div className="w-full lg:w-[340px] shrink-0 space-y-6">
+          {/* Info Card */}
+          <div className="border border-gray-200 bg-white">
+            <div className="p-6 space-y-5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-logo-red/10 flex items-center justify-center shrink-0">
+                  <Utensils className="w-5 h-5 text-logo-red" />
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-500">{isNl ? "Capaciteit" : "Capacity"}</span>
-                  <span className="text-white">{isNl ? "BEPERKT" : "LIMITED SEATS"}</span>
+                <h3 className="font-display text-[18px] uppercase tracking-tight text-foreground">
+                  {isNl ? "Onze Locaties" : "Our Locations"}
+                </h3>
+              </div>
+              <div className="space-y-4">
+                {locations.map((loc) => (
+                  <div key={loc.id} className="space-y-1">
+                    <p className="font-bold text-[14px] text-foreground">{loc.name}</p>
+                    {loc.address && (
+                      <p className="text-[12px] text-gray-500 flex items-start gap-1.5">
+                        <MapPin className="w-3 h-3 mt-0.5 shrink-0" />
+                        {loc.address}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className="border-t border-gray-100 pt-4">
+                <div className="flex items-center justify-between text-[12px] font-mono uppercase tracking-wider">
+                  <span className="text-gray-400">{isNl ? "Status" : "Status"}</span>
+                  <span className="text-logo-red font-bold">{isNl ? "OPEN" : "OPEN NOW"}</span>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Walk-ins Welcome card */}
-          <div className="bg-lime p-6">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-7 h-7 bg-black rounded-full flex items-center justify-center shrink-0">
-                <Info className="w-4 h-4 text-lime" />
+          <div className="border border-gray-200 bg-logo-gold/10">
+            <div className="p-6 space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-logo-gold flex items-center justify-center shrink-0">
+                  <Info className="w-4 h-4 text-white" />
+                </div>
+                <h3 className="font-display text-[18px] uppercase tracking-tight text-foreground">
+                  {isNl ? "Inloop Welkom" : "Walk-ins Welcome"}
+                </h3>
               </div>
+              <p className="text-[13px] text-gray-500 leading-relaxed">
+                {isNl
+                  ? "Gevoel voor spontaniteit? We houden altijd een paar tafels open voor de moedigen."
+                  : "Feeling spontaneous? We always keep a few tables open for the brave."}
+              </p>
             </div>
-            <h3 className="font-display text-[20px] uppercase tracking-tight text-black leading-none">
-              {isNl ? "Inloop Welkom" : "Walk-ins Welcome"}
-            </h3>
-            <p className="text-[12px] text-black/70 uppercase tracking-wide font-bold mt-3 leading-relaxed">
-              {isNl
-                ? "Gevoel voor spontaniteit? We houden altijd een paar tafels open voor de moedigen. Gewoon binnenlopen."
-                : "Feeling spontaneous? We always keep a few tables open for the brave. Just show up."}
-            </p>
+          </div>
+
+          {/* Contact Card */}
+          <div className="border border-gray-200 bg-white">
+            <div className="p-6 space-y-4">
+              <h3 className="font-display text-[16px] uppercase tracking-tight text-foreground">
+                {isNl ? "Hulp nodig?" : "Need Help?"}
+              </h3>
+              <p className="text-[12px] text-gray-500 leading-relaxed">
+                {isNl
+                  ? "Heb je vragen over je reservering? Neem contact met ons op."
+                  : "Have questions about your reservation? Get in touch with us."}
+              </p>
+              <a
+                href={`/${locale}/contact`}
+                className="inline-flex items-center gap-2 text-[12px] font-mono uppercase tracking-wider text-logo-red hover:text-logo-red-hover transition-colors"
+              >
+                {isNl ? "Contact opnemen" : "Contact us"}
+                <ArrowRight className="w-3.5 h-3.5" />
+              </a>
+            </div>
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+function ChevronDownIcon() {
+  return (
+    <svg width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M1 1L5 5L9 1" stroke="#9CA3AF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
   );
 }

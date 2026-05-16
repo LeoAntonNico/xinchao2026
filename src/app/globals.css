@@ -1,43 +1,106 @@
 @import "tailwindcss";
 
 @theme inline {
-  /* Legacy tokens (backward compat) */
-  --color-background: #0a0a0a;
-  --color-foreground: #ededed;
-  --color-sidebar: #1a1a1a;
-  --color-brand-red: #c41e3a;
-  --color-brand-gold: #d4a017;
-  --color-ghost-border: rgba(255,255,255,0.3);
-  --color-border-default: #333;
+  /* ─── Primary: Xin Chào Red ─── */
+  --color-logo-red: #E31B23;
+  --color-logo-red-hover: #B9141B;
+  --color-logo-red-soft: #FDE8EA;
+  --color-logo-red-dim: rgba(227, 27, 35, 0.10);
 
-  /* New brutalist/neon design system */
-  --color-surface: #131313;
-  --color-surface-bright: #393939;
-  --color-surface-container: #1f1f1f;
-  --color-surface-container-high: #2a2a2a;
-  --color-on-surface: #e2e2e2;
-  --color-on-surface-variant: #e6bcbd;
-  --color-outline: #ad8888;
-  --color-outline-variant: #5d3f40;
+  /* ─── Secondary: Dark Gold/Brown (Wageningen) ─── */
+  --color-logo-gold: #8B6914;
+  --color-logo-gold-hover: #6B5010;
+  --color-logo-gold-soft: #F5ECD4;
+  --color-logo-gold-dim: rgba(139, 105, 20, 0.12);
 
-  --color-neon-pink: #FF2D55;
-  --color-neon-pink-container: #ff5167;
-  --color-lime: #A4D037;
-  --color-lime-container: #7da600;
-  --color-soul-red: #FF0000;
+  /* ─── Location accents ─── */
+  --color-accent-utrecht: var(--color-logo-red);
+  --color-accent-wageningen: var(--color-logo-gold);
 
-  --color-primary: #ffb3b5;
-  --color-secondary: #a9d63c;
-  --color-tertiary: #ffb4a8;
+  /* ─── Base tokens (light mode) ─── */
+  --color-background: #FAF7F1;
+  --color-foreground: #171717;
+  --color-sidebar: #FFFDF8;
+  --color-brand-red: #E31B23;
+  --color-brand-gold: #8B6914;
+  --color-ghost-border: rgba(0,0,0,0.08);
+  --color-border-default: #DDD6CA;
 
+  /* ─── Surface system ─── */
+  --color-surface: #FFFDF8;
+  --color-surface-bright: #FFFFFF;
+  --color-surface-container: #F2EDE3;
+  --color-surface-container-high: #FAF7F1;
+  --color-on-surface: #171717;
+  --color-on-surface-variant: #5F5F5A;
+  --color-outline: #DDD6CA;
+  --color-outline-variant: #E8E2D6;
+
+  /* ─── Semantic ─── */
+  --color-success: #159947;
+  --color-warning: #D97706;
+  --color-error: #B9141B;
+
+  --color-primary: #E31B23;
+  --color-secondary: #8B6914;
+  --color-tertiary: #D97706;
+
+  /* ─── Typography ─── */
   --font-sans: var(--font-be-vietnam), 'Helvetica Neue', Arial, sans-serif;
   --font-mono: var(--font-space-grotesk), monospace;
   --font-display: var(--font-anton), Impact, sans-serif;
+
+  /* ─── Spacing tokens ─── */
+  --spacing-2xs: 0.25rem;   /* 4px */
+  --spacing-xs: 0.5rem;     /* 8px */
+  --spacing-sm: 0.75rem;    /* 12px */
+  --spacing-md: 1rem;       /* 16px */
+  --spacing-lg: 1.5rem;     /* 24px */
+  --spacing-xl: 2rem;       /* 32px */
+  --spacing-2xl: 3rem;      /* 48px */
+
+  /* ─── Max-width tokens (fix: Tailwind v4 links max-w-sm/md/lg/xl/2xl to spacing scale) ─── */
+  --max-width-sm: 24rem;
+  --max-width-md: 28rem;
+  --max-width-lg: 32rem;
+  --max-width-xl: 36rem;
+  --max-width-2xl: 42rem;
+  --max-width-3xl: 48rem;
+  --max-width-4xl: 56rem;
+  --max-width-5xl: 64rem;
+  --max-width-6xl: 72rem;
+  --max-width-7xl: 80rem;
+
+  /* ─── Radius tokens ─── */
+  --radius-sm: 0.375rem;    /* 6px */
+  --radius-md: 0.5rem;      /* 8px */
+  --radius-lg: 0.75rem;     /* 12px */
+  --radius-xl: 1rem;        /* 16px */
+  --radius-2xl: 1.5rem;     /* 24px */
+
+  /* ─── Shadow tokens ─── */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.06);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.08);
+  --shadow-xl: 0 16px 48px rgba(0,0,0,0.10);
+  --shadow-sticky: 0 -4px 20px rgba(0,0,0,0.08);
+
+  /* ─── Z-index tokens ─── */
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-drawer: 300;
+  --z-modal: 400;
+  --z-toast: 500;
+
+  /* ─── Transition tokens ─── */
+  --transition-fast: 150ms ease;
+  --transition-base: 250ms ease;
+  --transition-slow: 350ms ease;
 }
 
 body {
-  background: var(--color-surface);
-  color: var(--color-on-surface);
+  background: var(--color-background);
+  color: var(--color-foreground);
   font-family: var(--font-sans);
 }
 
@@ -46,8 +109,29 @@ body {
     scrollbar-gutter: stable;
   }
 
-  /* Sharp corners everywhere - brutalist shape language */
   *, *::before, *::after {
-    border-radius: 0 !important;
+    border-radius: 0;
+  }
+
+  /* Reduced motion support */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* Safe area inset for mobile sticky bars */
+@layer utilities {
+  .pb-safe {
+    padding-bottom: max(env(safe-area-inset-bottom), 1rem);
+  }
+  .mb-safe {
+    margin-bottom: max(env(safe-area-inset-bottom), 1rem);
+  }
+  .pb-sticky {
+    padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
   }
 }

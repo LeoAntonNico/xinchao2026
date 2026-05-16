@@ -94,13 +94,13 @@ export default function PrintTestPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+        <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
           <PrinterIcon />
           Print Test
         </h1>
         <button
           onClick={fetchQueue}
-          className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-white transition-colors"
+          className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-foreground transition-colors"
         >
           <RefreshIcon />
           Refresh
@@ -108,33 +108,33 @@ export default function PrintTestPage() {
       </div>
 
       <div className="grid grid-cols-4 gap-3">
-        <div className="p-3 rounded-xl border border-border-default bg-sidebar">
+        <div className="p-3 rounded-xl border border-border-default bg-white">
           <div className="text-xs text-gray-400 mb-1">Pending</div>
           <p className="text-2xl font-bold text-yellow-400">{pendingCount}</p>
         </div>
-        <div className="p-3 rounded-xl border border-border-default bg-sidebar">
+        <div className="p-3 rounded-xl border border-border-default bg-white">
           <div className="text-xs text-gray-400 mb-1">Printed</div>
           <p className="text-2xl font-bold text-emerald-400">{queue.filter((j) => j.status === "PRINTED").length}</p>
         </div>
-        <div className="p-3 rounded-xl border border-border-default bg-sidebar">
+        <div className="p-3 rounded-xl border border-border-default bg-white">
           <div className="text-xs text-gray-400 mb-1">Failed</div>
           <p className="text-2xl font-bold text-red-400">{failedCount}</p>
         </div>
-        <div className="p-3 rounded-xl border border-border-default bg-sidebar">
+        <div className="p-3 rounded-xl border border-border-default bg-white">
           <div className="text-xs text-gray-400 mb-1">Total Jobs</div>
-          <p className="text-2xl font-bold text-white">{queue.length}</p>
+          <p className="text-2xl font-bold text-foreground">{queue.length}</p>
         </div>
       </div>
 
-      <div className="bg-sidebar border border-border-default rounded-xl p-5 space-y-4">
-        <h2 className="text-lg font-semibold text-white">Test Receipt Print</h2>
+      <div className="bg-white border border-border-default rounded-xl p-5 space-y-4">
+        <h2 className="text-lg font-semibold text-foreground">Test Receipt Print</h2>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-400">Location:</span>
             <select
               value={location}
               onChange={(e) => setLocation(e.target.value)}
-              className="px-3 py-1.5 rounded-lg bg-black border border-gray-700 text-white text-sm focus:outline-none focus:border-brand-gold"
+              className="px-3 py-1.5 rounded-lg bg-black border border-gray-700 text-foreground text-sm focus:outline-none focus:border-brand-gold"
             >
               <option value="utrecht">Utrecht</option>
               <option value="wageningen">Wageningen</option>
@@ -143,7 +143,7 @@ export default function PrintTestPage() {
           <button
             onClick={handlePrint}
             disabled={printingLocation !== null}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-red hover:bg-red-700 text-white text-sm font-medium transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-red hover:bg-red-700 text-foreground text-sm font-medium transition-colors disabled:opacity-50"
           >
             <PrinterIcon />
             {printingLocation ? "Queuing..." : `Print Test to ${location === "utrecht" ? "Utrecht" : "Wageningen"}`}
@@ -156,19 +156,19 @@ export default function PrintTestPage() {
         )}
       </div>
 
-      <div className="bg-sidebar border border-border-default rounded-xl overflow-hidden">
+      <div className="bg-white border border-border-default rounded-xl overflow-hidden">
         <div className="px-4 py-3 border-b border-border-default flex items-center justify-between">
-          <h2 className="text-sm font-medium text-gray-300">Receipt Preview</h2>
+          <h2 className="text-sm font-medium text-gray-500">Receipt Preview</h2>
           <span className="text-xs text-gray-500">{location === "utrecht" ? "Utrecht" : "Wageningen"}</span>
         </div>
-        <pre className="p-4 text-xs text-gray-300 overflow-x-auto whitespace-pre font-mono leading-relaxed">
+        <pre className="p-4 text-xs text-gray-500 overflow-x-auto whitespace-pre font-mono leading-relaxed">
           {preview}
         </pre>
       </div>
 
-      <div className="bg-sidebar border border-border-default rounded-xl overflow-hidden">
+      <div className="bg-white border border-border-default rounded-xl overflow-hidden">
         <div className="px-4 py-3 border-b border-border-default">
-          <h2 className="text-sm font-medium text-gray-300">Recent Print Jobs</h2>
+          <h2 className="text-sm font-medium text-gray-500">Recent Print Jobs</h2>
         </div>
         <table className="w-full text-sm">
           <thead>
@@ -184,9 +184,9 @@ export default function PrintTestPage() {
           </thead>
           <tbody>
             {queue.slice(0, 20).map((job) => (
-              <tr key={job.id} className="border-b border-border-default last:border-0 hover:bg-white/5">
+              <tr key={job.id} className="border-b border-border-default last:border-0 hover:bg-gray-50">
                 <td className="px-4 py-3 font-mono text-xs text-gray-500">{job.id.slice(0, 8)}</td>
-                <td className="px-4 py-3 text-white capitalize">{job.location}</td>
+                <td className="px-4 py-3 text-foreground capitalize">{job.location}</td>
                 <td className="px-4 py-3 text-gray-400 text-xs">{job.orderId ? job.orderId.slice(0, 8) : "test"}</td>
                 <td className="px-4 py-3">
                   <span

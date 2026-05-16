@@ -29,16 +29,18 @@ export default async function LocaleLayout({
   setRequestLocale(locale);
   const messages = await getMessages();
 
-    return (
+  return (
     <html lang={locale} className={`${anton.variable} ${beVietnam.variable} ${spaceGrotesk.variable} ${geistMono.variable}`} suppressHydrationWarning>
       <body className="bg-background text-foreground">
         <NextIntlClientProvider messages={messages} locale={locale}>
           <CartProvider>
             <div className="flex min-h-screen">
               <Sidebar />
-              <main className="flex-1">
-                {children}
-              </main>
+              <div className="flex-1 min-w-0 overflow-x-hidden flex flex-col">
+                <main className="flex-1">
+                  {children}
+                </main>
+              </div>
             </div>
             <CartDrawer />
             <CartButton />

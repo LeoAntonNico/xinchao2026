@@ -2,32 +2,27 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createPayment } from "@/lib/mollie";
 import { sendOrderPendingEmail } from "@/lib/notifications";
-import { Prisma } from "@prisma/client";
 
 interface OrderItemInput {
   price: number;
   quantity: number;
   menuItemId: string;
+  variantId?: string;
+  variantName?: string;
+  modifierIds?: string[];
+  modifierNames?: string[];
+  exclusionIds?: string[];
+  exclusionNames?: string[];
 }
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { items, locationId, slot: slotId, name, phone, email, notes } = body;
+    const { items, locationId, slot: slotId, name, phone, email, notes, customerId } = body;
     const total = items.reduce(
       (sum: number, i: OrderItemInput) => sum + i.price * i.quantity,
       0
     );
-
-    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      const slot = await tx.pickupSlot.update({
-        where: { id: slotId },
-        data: { booked: { increment: 1 } },
-      });
-      if (slot.booked > slot.capacity) {
-        throw new Error("Slot full");
-      }
-    });
 
     const order = await prisma.order.create({
       data: {
@@ -36,6 +31,7 @@ export async function POST(req: Request) {
         customerPhone: phone,
         customerEmail: email || null,
         notes: notes || null,
+        customerId: customerId || null,
         locationId,
         pickupSlotId: slotId,
         items: {
@@ -43,6 +39,12 @@ export async function POST(req: Request) {
             quantity: i.quantity,
             price: i.price,
             menuItemId: i.menuItemId,
+            variantId: i.variantId || null,
+            variantName: i.variantName || null,
+            modifierIds: i.modifierIds || [],
+            modifierNames: i.modifierNames || [],
+            exclusionIds: i.exclusionIds || [],
+            exclusionNames: i.exclusionNames || [],
           })),
         },
       },

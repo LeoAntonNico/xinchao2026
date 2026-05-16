@@ -3,13 +3,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslations, useLocale } from "next-intl";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { User, Menu, X } from "lucide-react";
+import Image from "next/image";
 
 function getHref(locale: string, path: string) {
   return `/${locale}${path}`;
 }
 
-// Inline SVG icons — no lucide-react dependency
+// Inline SVG icons
 function HomeIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -18,19 +20,22 @@ function HomeIcon({ className }: { className?: string }) {
     </svg>
   );
 }
-function DollarIcon({ className }: { className?: string }) {
+function BowlIcon({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <line x1="12" y1="1" x2="12" y2="23" />
-      <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M6 8L4.8 12.8A4 4 0 0 0 8.8 18h6.4a4 4 0 0 0 4-5.2L18 8" />
+      <path d="M6 8h12" />
+      <path d="M7 8V6a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2" />
     </svg>
   );
 }
 function TableIcon({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10" />
-      <path d="M5 21h14" />
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+      <line x1="16" y1="2" x2="16" y2="6" />
+      <line x1="8" y1="2" x2="8" y2="6" />
+      <line x1="3" y1="10" x2="21" y2="10" />
     </svg>
   );
 }
@@ -69,8 +74,9 @@ function GlobeIcon({ className }: { className?: string }) {
 
 const navItems = [
   { key: "home", href: "/", icon: HomeIcon },
-  { key: "order", href: "/order", icon: DollarIcon },
+  { key: "order", href: "/order", icon: BowlIcon },
   { key: "reserve", href: "/reserve", icon: TableIcon },
+  { key: "myAccount", href: "/my-account", icon: User },
   { key: "contact", href: "/contact", icon: HelpIcon },
 ];
 
@@ -79,44 +85,79 @@ export default function Sidebar() {
   const locale = useLocale();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
 
-  const switchLocale = locale === 'en' ? 'nl' : 'en';
-  const currentPath = pathname.replace('/' + locale, '');
+  const switchLocale = locale === "en" ? "nl" : "en";
+  const currentPath = pathname.replace("/" + locale, "");
+
+  // Scroll detection for header background
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 40);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  // Lock body scroll when mobile menu is open
+  useEffect(() => {
+    if (mobileOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [mobileOpen]);
 
   return (
     <>
-      {/* Mobile hamburger */}
-      <button
-        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-surface border border-white/10"
-        onClick={() => setMobileOpen(!mobileOpen)}
-        aria-label="Toggle menu"
+      {/* Mobile integrated header */}
+      <header
+        className={`lg:hidden fixed top-0 left-0 right-0 z-[200] h-12 flex items-center justify-between px-4 transition-all duration-300 ${
+          scrolled
+            ? "bg-surface/95 backdrop-blur-md shadow-sm border-b border-outline-variant"
+            : "bg-transparent"
+        }`}
       >
-        <div className="space-y-1">
-          <span className="block w-5 h-0.5 bg-white" />
-          <span className="block w-5 h-0.5 bg-white" />
-          <span className="block w-5 h-0.5 bg-white" />
-        </div>
-      </button>
+        <Link href={getHref(locale, "/")} className="flex items-center" onClick={() => setMobileOpen(false)}>
+          <span className={`font-display text-lg tracking-tight transition-colors ${scrolled ? "text-logo-red" : "text-white drop-shadow-md"}`}>
+            xin chào
+          </span>
+        </Link>
 
-      {/* Sidebar */}
+        <button
+          className={`p-2 rounded-md transition-colors ${
+            scrolled
+              ? "text-foreground hover:bg-surface-container"
+              : "text-white hover:bg-white/10"
+          }`}
+          onClick={() => setMobileOpen(!mobileOpen)}
+          aria-label={mobileOpen ? "Close menu" : "Open menu"}
+          aria-expanded={mobileOpen}
+        >
+          {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+        </button>
+      </header>
+
+      {/* Sidebar drawer */}
       <aside
-        className={` fixed lg:sticky lg:top-0 inset-y-0 left-0 z-40 w-[280px] bg-surface border-r border-white/5 transform transition-transform duration-300 ease-in-out ${mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"} flex flex-col h-screen justify-between `}
+        className={`fixed lg:sticky lg:top-0 inset-y-0 right-0 lg:left-0 z-[150] w-[260px] lg:w-[280px] bg-sidebar border-l lg:border-l-0 lg:border-r border-gray-200 transform transition-transform duration-300 ease-in-out ${mobileOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"} flex flex-col h-screen justify-between`}
       >
         <div>
           {/* Branding */}
-          <div className="px-8 pt-12 pb-8">
-            <Link href={getHref(locale, "/")} className="block">
-              <h1 className="text-[28px] font-display font-normal text-on-surface-variant tracking-tight lowercase leading-none">
-                xin chào
-              </h1>
-              <p className="mt-2 text-[10px] tracking-[0.18em] text-brand-gold uppercase font-medium font-mono">
-                Vietnamese Street Food
-              </p>
+          <div className="px-6 pt-10 pb-6">
+            <Link href={getHref(locale, "/")} className="block" onClick={() => setMobileOpen(false)}>
+              <Image
+                src="/images/logo.jpg"
+                alt="Xin Chào Vietnamese Street Food"
+                width={200}
+                height={80}
+                className="w-full max-w-[180px] h-auto"
+                priority
+              />
             </Link>
           </div>
 
           {/* Navigation */}
-          <nav className="px-6 py-4 space-y-2">
+          <nav className="px-6 py-4 space-y-1">
             {navItems.map((item) => {
               const href = getHref(locale, item.href);
               const isActive = pathname === href;
@@ -126,7 +167,7 @@ export default function Sidebar() {
                   key={item.key}
                   href={href}
                   onClick={() => setMobileOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-3 text-[13px] tracking-[0.06em] uppercase font-bold font-mono transition-colors duration-200 ${isActive ? "bg-lime text-black" : "text-on-surface-variant hover:text-white"}`}
+                  className={`flex items-center gap-3 px-3 py-3 text-[13px] tracking-[0.06em] uppercase font-bold font-mono transition-colors duration-200 ${isActive ? "bg-logo-red text-white" : "text-gray-500 hover:text-gray-800 hover:bg-gray-100"}`}
                 >
                   <Icon className="w-[18px] h-[18px] shrink-0" />
                   {t(item.key)}
@@ -139,17 +180,17 @@ export default function Sidebar() {
         {/* Footer area */}
         <div className="px-8 pb-10">
           <div className="flex items-center gap-4 mb-6">
-            <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-white transition-colors" aria-label="Facebook">
+            <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-gray-700 transition-colors" aria-label="Facebook">
               <FacebookIcon className="w-4 h-4" />
             </a>
-            <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-white transition-colors" aria-label="Instagram">
+            <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-gray-700 transition-colors" aria-label="Instagram">
               <InstagramIcon className="w-4 h-4" />
             </a>
           </div>
 
           <Link
             href={getHref(switchLocale, currentPath)}
-            className="flex items-center gap-2 text-[11px] text-gray-500 hover:text-gray-300 transition-colors tracking-[0.1em] uppercase font-mono"
+            className="flex items-center gap-2 text-[11px] text-gray-400 hover:text-gray-600 transition-colors tracking-[0.1em] uppercase font-mono"
           >
             <GlobeIcon className="w-3.5 h-3.5" />
             <span>{locale === "en" ? "Nederlands" : "English"}</span>
@@ -158,7 +199,7 @@ export default function Sidebar() {
       </aside>
 
       {mobileOpen && (
-        <div className="fixed inset-0 bg-black/60 z-30 lg:hidden" onClick={() => setMobileOpen(false)} />
+        <div className="fixed inset-0 bg-black/30 z-[140] lg:hidden" onClick={() => setMobileOpen(false)} />
       )}
     </>
   );

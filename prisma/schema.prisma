@@ -28,6 +28,17 @@ model Location {
   orders       Order[]
 }
 
+model Customer {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  phone     String
+  password  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  orders    Order[]
+}
+
 model MenuCategory {
   id        String @id @default(uuid())
   name      String
@@ -51,6 +62,7 @@ model MenuItem {
   imageUrl         String? // legacy primary image
   imageUrls        String[] @default([]) // photo gallery
   isAvailable      Boolean @default(true)
+  isDineInOnly     Boolean @default(false)
   sortOrder        Int     @default(0)
 
   dietaryTags String[] @default([])
@@ -61,6 +73,17 @@ model MenuItem {
   orderItems OrderItem[]
   variants   ProductVariant[]
   modifiers  ProductModifier[]
+  exclusions ProductExclusion[]
+}
+
+model ProductExclusion {
+  id        String  @id @default(uuid())
+  name      String
+  nameNl    String?
+  sortOrder Int     @default(0)
+
+  menuItemId String
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
 }
 
 model DietaryOption {
@@ -123,8 +146,10 @@ model Order {
 
   locationId   String
   pickupSlotId String
+  customerId   String?
   location     Location   @relation(fields: [locationId], references: [id])
   pickupSlot   PickupSlot @relation(fields: [pickupSlotId], references: [id])
+  customer     Customer?  @relation(fields: [customerId], references: [id])
   items        OrderItem[]
 }
 
@@ -136,6 +161,8 @@ model OrderItem {
   variantName   String?
   modifierIds   String[] @default([])
   modifierNames String[] @default([])
+  exclusionIds   String[] @default([])
+  exclusionNames String[] @default([])
 
   orderId    String
   menuItemId String

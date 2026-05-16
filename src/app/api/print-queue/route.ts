@@ -9,7 +9,9 @@ import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { buildReceiptFromOrder, formatReceiptEscPos, formatReceiptText, ReceiptData } from '@/lib/receipt-formatter';
 
-const AGENT_SECRET = process.env.PRINT_AGENT_SECRET || '';
+function getAgentSecret() {
+  return process.env['PRINT_AGENT_SECRET'] || '';
+}
 
 function unauthorized() {
   return Response.json({ error: 'Unauthorized' }, { status: 401 });
@@ -20,7 +22,7 @@ function unauthorized() {
    ═══════════════════════════════ */
 export async function GET(req: NextRequest) {
   const secret = req.headers.get('x-agent-secret');
-  if (!AGENT_SECRET || secret !== AGENT_SECRET) return unauthorized();
+  if (!getAgentSecret() || secret !== getAgentSecret()) return unauthorized();
 
   const { searchParams } = new URL(req.url);
   const location = searchParams.get('location');

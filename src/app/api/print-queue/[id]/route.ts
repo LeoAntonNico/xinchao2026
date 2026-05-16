@@ -1,14 +1,16 @@
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-const AGENT_SECRET = process.env.PRINT_AGENT_SECRET || '';
+function getAgentSecret() {
+  return process.env['PRINT_AGENT_SECRET'] || '';
+}
 
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const secret = req.headers.get('x-agent-secret');
-  if (!AGENT_SECRET || secret !== AGENT_SECRET) {
+  if (!getAgentSecret() || secret !== getAgentSecret()) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

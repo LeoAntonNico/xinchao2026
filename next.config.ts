@@ -10,7 +10,24 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: '*.supabase.co' },
       { protocol: 'https', hostname: '*.googleusercontent.com' },
     ],
-    unoptimized: true,  // allow any remote image during dev
+    unoptimized: true,
+  },
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'X-Frame-Options',
+            value: 'ALLOWALL',
+          },
+          {
+            key: 'Content-Security-Policy',
+            value: 'frame-ancestors *;',
+          },
+        ],
+      },
+    ];
   },
 };
 

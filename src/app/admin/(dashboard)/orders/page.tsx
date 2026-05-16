@@ -91,7 +91,7 @@ export default function OrdersPage() {
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+        <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
           <Package className="w-6 h-6 text-brand-gold" />
           Orders
         </h1>
@@ -106,17 +106,17 @@ export default function OrdersPage() {
               key={s}
               onClick={() => setActiveFilter(activeFilter === s ? null : s)}
               className={`p-3 rounded-xl border text-left transition-all ${
-                activeFilter === s ? "border-brand-gold/50 bg-brand-gold/5" : "border-border-default hover:bg-white/5"
+                activeFilter === s ? "border-brand-gold/50 bg-brand-gold/5" : "border-border-default hover:bg-gray-50"
               }`}
             >
               <div className="text-xs text-gray-400 mb-1">{cfg.label}</div>
-              <p className="text-2xl font-bold text-white">{counts[s] || 0}</p>
+              <p className="text-2xl font-bold text-foreground">{counts[s] || 0}</p>
             </button>
           );
         })}
       </div>
 
-      <div className="bg-sidebar border border-border-default rounded-xl overflow-hidden">
+      <div className="bg-white border border-border-default rounded-xl overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border-default text-gray-400 text-left">
@@ -133,26 +133,26 @@ export default function OrdersPage() {
             {filtered.map((order) => {
               const cfg = statusConfig[order.status] || statusConfig.PENDING;
               return (
-                <tr key={order.id} className="border-b border-border-default last:border-0 hover:bg-white/5">
+                <tr key={order.id} className="border-b border-border-default last:border-0 hover:bg-gray-50">
                   <td className="px-4 py-3">
                     <div className="font-mono text-gray-400 text-xs">{order.id.slice(0, 8)}</div>
                     <div className="text-gray-500 text-xs">{order.location.name}</div>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="text-white font-medium">{order.customerName}</div>
+                    <div className="text-foreground font-medium">{order.customerName}</div>
                     <div className="text-gray-500 text-xs">{order.customerPhone}</div>
                     {order.notes && <div className="text-brand-gold text-xs mt-0.5">{order.notes}</div>}
                   </td>
                   <td className="px-4 py-3">
-                    <div className="text-gray-300">{new Date(order.pickupSlot.date).toLocaleDateString("nl-NL")}</div>
+                    <div className="text-gray-500">{new Date(order.pickupSlot.date).toLocaleDateString("nl-NL")}</div>
                     <div className="text-gray-500 text-xs">{order.pickupSlot.time}</div>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="text-gray-300 text-xs max-w-[200px] truncate">
+                    <div className="text-gray-500 text-xs max-w-[200px] truncate">
                       {order.items.map((i) => `${i.quantity}x ${i.menuItem.name}`).join(", ")}
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-white font-medium">{formatPrice(order.totalAmount)}</td>
+                  <td className="px-4 py-3 text-foreground font-medium">{formatPrice(order.totalAmount)}</td>
                   <td className="px-4 py-3">
                     <span className={`px-2 py-0.5 rounded text-xs font-medium border ${cfg.bg} ${cfg.color} border-current/20`}>
                       {cfg.label}
@@ -171,7 +171,7 @@ export default function OrdersPage() {
                           if (res.ok) fetchOrders();
                         }}
                         title="Print receipt"
-                        className="px-2 py-1 rounded text-xs border border-gray-600 text-gray-300 hover:bg-gray-700 transition-colors"
+                        className="px-2 py-1 rounded text-xs border border-gray-600 text-gray-500 hover:bg-gray-200 transition-colors"
                       >
                         Print
                       </button>
@@ -179,7 +179,7 @@ export default function OrdersPage() {
                         <button
                           onClick={() => advanceStatus(order.id, cfg.next!)}
                           disabled={updatingId === order.id}
-                          className="px-2 py-1 rounded text-xs bg-brand-red hover:bg-red-700 text-white transition-colors disabled:opacity-50"
+                          className="px-2 py-1 rounded text-xs bg-brand-red hover:bg-red-700 text-foreground transition-colors disabled:opacity-50"
                         >
                           {`> ${statusConfig[cfg.next].label}`}
                         </button>
@@ -197,7 +197,7 @@ export default function OrdersPage() {
                         <button
                           onClick={() => advanceStatus(order.id, "PENDING")}
                           disabled={updatingId === order.id}
-                          className="p-1 text-gray-400 hover:text-white transition-colors disabled:opacity-50"
+                          className="p-1 text-gray-400 hover:text-foreground transition-colors disabled:opacity-50"
                           title="Restore"
                         >
                           <RotateCcw className="w-3.5 h-3.5" />

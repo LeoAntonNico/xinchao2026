@@ -9,7 +9,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const { id } = await params;
   const item = await prisma.menuItem.findUnique({
     where: { id },
-    include: { categories: true, locations: true, variants: { orderBy: { sortOrder: "asc" } }, modifiers: { orderBy: { sortOrder: "asc" } } },
+    include: { categories: true, locations: true, variants: { orderBy: { sortOrder: "asc" } }, modifiers: { orderBy: { sortOrder: "asc" } }, exclusions: { orderBy: { sortOrder: "asc" } } },
   });
   if (!item) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json(item);
@@ -20,7 +20,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
   const body = await request.json();
-  const fields = ["name","nameNl","description","descriptionNl","shortDescription","shortDescriptionNl","price","salePrice","taxClass","imageUrl","imageUrls","isAvailable","sortOrder","dietaryTags","isSpicy","categoryIds","locationIds"];
+  const fields = ["name","nameNl","description","descriptionNl","shortDescription","shortDescriptionNl","price","salePrice","taxClass","imageUrl","imageUrls","isAvailable","isDineInOnly","sortOrder","dietaryTags","isSpicy","categoryIds","locationIds"];
 
   const data: Record<string, unknown> = {};
   for (const f of fields) {
@@ -34,7 +34,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const item = await prisma.menuItem.update({
     where: { id },
     data,
-    include: { categories: true, locations: true, variants: { orderBy: { sortOrder: "asc" } }, modifiers: { orderBy: { sortOrder: "asc" } } },
+    include: { categories: true, locations: true, variants: { orderBy: { sortOrder: "asc" } }, modifiers: { orderBy: { sortOrder: "asc" } }, exclusions: { orderBy: { sortOrder: "asc" } } },
   });
   return NextResponse.json(item);
 }

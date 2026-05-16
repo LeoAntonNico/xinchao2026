@@ -7,12 +7,12 @@ import Link from "next/link";
 import Image from "next/image";
 import {
   MapPin, Clock, ArrowLeft, Plus, Minus, ShoppingCart,
-  Check, X, ChevronRight, Utensils, SlidersHorizontal, Flame
+  Check, X, ChevronRight, Utensils, SlidersHorizontal, Flame,
+  Calendar, Zap, Moon, ChevronDown
 } from "lucide-react";
 
-/* ═══════════════════════════════════════════
-   TYPES
-   ═══════════════════════════════════════════ */
+import TimeSlotPicker from "./TimeSlotPicker";
+import OrderSummary from "./OrderSummary";
 
 interface Location {
   id: string;
@@ -30,6 +30,7 @@ interface PickupSlot {
 
 interface Variant { id: string; name: string; nameNl?: string; price: number; }
 interface Modifier { id: string; name: string; nameNl?: string; price: number; }
+interface Exclusion { id: string; name: string; nameNl?: string; }
 
 interface MenuItem {
   id: string;
@@ -44,8 +45,11 @@ interface MenuItem {
   dietaryTags: string[];
   isSpicy: boolean;
   isPopular?: boolean;
+  isAvailable: boolean;
+  isDineInOnly: boolean;
   variants: Variant[];
   modifiers: Modifier[];
+  exclusions: Exclusion[];
 }
 
 interface MenuCategory {
@@ -64,7 +68,8 @@ function fmtPrice(cents: number) {
 }
 
 function fmtDate(dateStr: string, locale: string) {
-  const d = new Date(dateStr);
+  if (!dateStr) return "";
+  const d = new Date(dateStr + "T00:00:00");
   return d.toLocaleDateString(locale === "nl" ? "nl-NL" : "en-US", {
     weekday: "short", day: "numeric", month: "short",
   });
@@ -97,7 +102,9 @@ export default function OrderPage() {
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
   const [selectedVariant, setSelectedVariant] = useState<string>("");
   const [selectedModifiers, setSelectedModifiers] = useState<string[]>([]);
+  const [selectedExclusions, setSelectedExclusions] = useState<string[]>([]);
   const [dietaryFilter, setDietaryFilter] = useState<string[]>([]);
+  const [cartOpen, setCartOpen] = useState(false);
 
   /* ── fetch data ── */
   useEffect(() => {
@@ -159,6 +166,9 @@ export default function OrderPage() {
     const modNames = item.modifiers
       .filter((m) => selectedModifiers.includes(m.id))
       .map((m) => isNl && m.nameNl ? m.nameNl : m.name);
+    const exclNames = item.exclusions
+      .filter((e) => selectedExclusions.includes(e.id))
+      .map((e) => isNl && e.nameNl ? e.nameNl : e.name);
     const vName = selectedVariant
       ? item.variants.find((v) => v.id === selectedVariant)?.name
       : undefined;
@@ -170,15 +180,39 @@ export default function OrderPage() {
       variantName: vName,
       modifierIds: selectedModifiers,
       modifierNames: modNames,
+      exclusionIds: selectedExclusions,
+      exclusionNames: exclNames,
     });
     setSelectedItem(null);
     setSelectedVariant("");
     setSelectedModifiers([]);
+    setSelectedExclusions([]);
+  }
+
+  function handleQuickAdd(item: MenuItem) {
+    if (item.variants.length > 0 || item.modifiers.length > 0 || item.exclusions.length > 0) {
+      setSelectedItem(item);
+      setSelectedVariant(item.variants[0]?.id || "");
+      setSelectedModifiers([]);
+      setSelectedExclusions([]);
+    } else {
+      addItem({
+        menuItemId: item.id,
+        name: isNl && item.nameNl ? item.nameNl : item.name,
+        price: item.salePrice && item.salePrice < item.price ? item.salePrice : item.price,
+      });
+    }
   }
 
   function toggleModifier(modId: string) {
     setSelectedModifiers((prev) =>
       prev.includes(modId) ? prev.filter((id) => id !== modId) : [...prev, modId]
+    );
+  }
+
+  function toggleExclusion(exclId: string) {
+    setSelectedExclusions((prev) =>
+      prev.includes(exclId) ? prev.filter((id) => id !== exclId) : [...prev, exclId]
     );
   }
 
@@ -206,61 +240,122 @@ export default function OrderPage() {
      LOCATION SELECTION
      ═══════════════════════════════════════════ */
   if (step === "location") {
-    const accentMap: Record<string, { bar: string; badge: string; text: string; border: string; btnText: string }> = {
-      utrecht:   { bar: "bg-neon-pink", badge: "bg-neon-pink", text: "text-neon-pink", border: "border-neon-pink", btnText: "text-neon-pink" },
-      wageningen:{ bar: "bg-lime",       badge: "bg-lime",       text: "text-lime",       border: "border-lime",       btnText: "text-lime" },
-    };
+    const stepLabels = isNl
+      ? ["Locatie", "Kies afhaaltijd", "Bestellen"]
+      : ["Location", "Choose pickup time", "Order"];
+
+    const currentStep = selectedSlot ? 3 : selectedLocation ? 2 : 1;
 
     return (
-      <div className="space-y-10 pb-20 px-6 md:px-10">
-        {/* Header */}
-        <div className="space-y-2 pt-6">
-          <h1 className="font-display text-[36px] md:text-[48px] leading-none tracking-tight uppercase italic text-white">
-            {isNl ? "Hoi, hoe gaat het?" : "Hey, what's up?"}
-          </h1>
-          <p className="text-[14px] text-gray-400 font-mono tracking-wide">
+      <div className="space-y-8 pb-20 px-6 md:px-10">
+        {/* ── Progress Stepper ── */}
+        <div className="pt-8">
+          <div className="flex items-center gap-0 max-w-2xl">
+            {stepLabels.map((label, idx) => {
+              const stepNum = idx + 1;
+              const isDone = currentStep > stepNum;
+              const isActive = currentStep === stepNum;
+              const isLast = idx === stepLabels.length - 1;
+              return (
+                <div key={idx} className="flex items-center flex-1">
+                  <div className="flex items-center gap-2 shrink-0">
+                    <div className={`w-7 h-7 flex items-center justify-center text-[12px] font-bold font-mono border transition-colors ${
+                      isDone
+                        ? "bg-logo-red border-logo-red text-foreground"
+                        : isActive
+                        ? "bg-logo-red border-logo-red text-foreground"
+                        : "bg-transparent border-gray-200 text-foreground/40"
+                    }`}>
+                      {isDone ? <Check className="w-3.5 h-3.5" /> : stepNum}
+                    </div>
+                    <span className={`hidden sm:inline text-[11px] font-mono uppercase tracking-wide whitespace-nowrap ${
+                      isDone || isActive ? "text-foreground" : "text-foreground/40"
+                    }`}>
+                      {label}
+                    </span>
+                    {isDone && (
+                      <Check className="w-3 h-3 text-logo-red hidden sm:block" />
+                    )}
+                  </div>
+                  {!isLast && (
+                    <div className={`h-px flex-1 mx-2 transition-colors ${
+                      currentStep > stepNum ? "bg-logo-red/60" : "bg-white/10"
+                    }`} />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ── Header ── */}
+        <div className="space-y-1">
+          <p className="text-[13px] text-gray-400 font-mono tracking-wide">
             {isNl ? "Kies waar je wilt bestellen" : "Choose where you'd like to order"}
           </p>
         </div>
 
-        {/* Location cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+        {/* ── Location Cards ── */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
           {locations.map((loc) => {
-            const a = accentMap[loc.name.toLowerCase()] || accentMap.utrecht;
             const selected = selectedLocation === loc.id;
             return (
               <button
                 key={loc.id}
                 onClick={() => setSelectedLocation(loc.id)}
-                className={`relative text-left bg-surface-container border overflow-hidden transition-all ${selected ? `${a.border} border-2` : "border-white/10 hover:border-white/20"}`}
+                className={`relative text-left bg-surface overflow-hidden transition-all group ${
+                  selected
+                    ? "ring-2 ring-logo-red shadow-[0_0_20px_rgba(255,26,26,0.25)]"
+                    : "border border-gray-200 hover:border-gray-200"
+                }`}
               >
-                <div className={`absolute left-0 top-0 bottom-0 w-[8px] ${a.bar}`} />
-                <div className="pl-5 p-0">
-                  <div className="flex items-center justify-between px-4 pt-4 pb-2">
-                    <span className={`inline-block ${a.badge} text-black text-[10px] font-bold font-mono tracking-[0.1em] uppercase px-2 py-1`}>
-                      OPEN NOW
-                    </span>
-                    <span className="font-display text-[20px] font-normal italic uppercase text-white tracking-tight">
-                      {loc.name}
-                    </span>
+                {/* Top-right checkmark badge when selected */}
+                {selected && (
+                  <div className="absolute top-3 right-3 z-20 w-6 h-6 bg-logo-red flex items-center justify-center">
+                    <Check className="w-4 h-4 text-foreground" strokeWidth={3} />
                   </div>
-                  <div className="relative w-full aspect-[16/9] overflow-hidden">
-                    <Image
-                      src="/images/hero-pho.jpg"
-                      alt={loc.name}
-                      fill
-                      className="object-cover grayscale"
-                      sizes="(max-width: 768px) 100vw, 50vw"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-surface-container via-transparent to-transparent" />
+                )}
+
+                {/* OPEN NOW badge */}
+                <div className="absolute top-3 left-3 z-20">
+                  <span className="inline-block bg-logo-red text-foreground text-[10px] font-bold font-mono tracking-[0.08em] uppercase px-2.5 py-1">
+                    OPEN NOW
+                  </span>
+                </div>
+
+                {/* Hero image */}
+                <div className="relative w-full aspect-[4/3] overflow-hidden">
+                  <Image
+                    src="/images/hero-pho.jpg"
+                    alt={loc.name}
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 768px) 100vw, 50vw"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#1a1a1a] via-[#1a1a1a]/20 to-transparent" />
+                </div>
+
+                {/* Info + Button */}
+                <div className="px-4 py-4 space-y-3">
+                  <h3 className="font-display text-[18px] font-bold uppercase text-foreground tracking-tight">
+                    {loc.name}
+                  </h3>
+                  <div className="flex items-start gap-1.5 text-[12px] text-foreground/60">
+                    <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                    <span className="leading-relaxed">{loc.address}</span>
                   </div>
-                  <div className="px-4 py-4 space-y-3">
-                    <p className="text-[13px] text-white/80 leading-relaxed uppercase tracking-wide">
-                      {loc.address}
-                    </p>
-                    <div className={`inline-flex items-center justify-center w-full py-3 border ${a.border} ${a.btnText} text-[12px] font-bold font-mono tracking-[0.1em] uppercase transition-colors ${selected ? `${a.badge} text-black` : "bg-transparent hover:bg-white/5"}`}>
-                      {isNl ? `${loc.name.toUpperCase()} SELECTEREN` : `SELECT ${loc.name.toUpperCase()}`}
-                    </div>
+                  <div className={`inline-flex items-center justify-center w-full py-2.5 text-[11px] font-bold font-mono tracking-[0.1em] uppercase transition-all ${
+                    selected
+                      ? "bg-logo-red text-foreground"
+                      : "border border-logo-red text-logo-red bg-transparent hover:bg-logo-red/10"
+                  }`}>
+                    {selected ? (
+                      <span className="flex items-center gap-2">
+                        <Check className="w-3.5 h-3.5" /> {isNl ? "Geselecteerd" : "Selected"}
+                      </span>
+                    ) : (
+                      isNl ? "Kies locatie" : "Choose location"
+                    )}
                   </div>
                 </div>
               </button>
@@ -268,28 +363,15 @@ export default function OrderPage() {
           })}
         </div>
 
-        {/* Time slots */}
+        {/* ── Order Summary + Time Picker ── */}
         {selectedLocation && (
-          <div className="space-y-4">
-            <h2 className="font-display text-[24px] font-normal uppercase italic text-white tracking-tight">
-              {isNl ? "Kies een afhaaltijd" : "Pick a pickup time"}
-            </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-              {slots.map((slot) => (
-                <button
-                  key={slot.id}
-                  onClick={() => setSelectedSlot(slot.id)}
-                  className={`p-4 border text-center transition-all ${
-                    selectedSlot === slot.id
-                      ? "border-brand-gold bg-brand-gold/10 text-brand-gold"
-                      : "border-white/10 text-gray-300 hover:border-white/30 hover:bg-white/[0.02]"
-                  }`}
-                >
-                  <div className="font-medium text-sm">{fmtDate(slot.date, locale)}</div>
-                  <div className="text-xs text-gray-400 mt-0.5">{slot.time}</div>
-                </button>
-              ))}
-            </div>
+          <div className="space-y-8">
+            <TimeSlotPicker
+              slots={slots}
+              selectedSlot={selectedSlot}
+              onSelect={(id) => setSelectedSlot(id)}
+              locale={locale}
+            />
           </div>
         )}
       </div>
@@ -297,12 +379,18 @@ export default function OrderPage() {
   }
 
   /* ── filtered categories ── */
-  const filteredCategories = dietaryFilter.length > 0
-    ? categories.map((c) => ({
-        ...c,
-        items: c.items.filter((i) => dietaryFilter.every((tag) => i.dietaryTags.includes(tag))),
-      })).filter((c) => c.items.length > 0)
-    : categories;
+  const filteredCategories = (() => {
+    let cats = dietaryFilter.length > 0
+      ? categories.map((c) => ({
+          ...c,
+          items: c.items.filter((i) => dietaryFilter.every((tag) => i.dietaryTags.includes(tag))),
+        })).filter((c) => c.items.length > 0)
+      : categories;
+    if (activeCat) {
+      cats = cats.filter((c) => c.id === activeCat);
+    }
+    return cats;
+  })();
 
   const locName = locations.find((l) => l.id === selectedLocation)?.name || "";
   const slotDate = fmtDate(slots.find((s) => s.id === selectedSlot)?.date || "", locale);
@@ -312,26 +400,37 @@ export default function OrderPage() {
      MENU BROWSING + CART
      ═══════════════════════════════════════════ */
   return (
-    <div className="flex flex-col lg:flex-row h-[calc(100vh-80px)] min-h-0">
+    <div className="flex flex-col lg:flex-row lg:h-[calc(100vh-80px)] lg:min-h-0">
       {/* ═══════ LEFT PANEL ═══════ */}
-      <div className="flex-1 min-w-0 overflow-y-auto">
+      <div className="flex-1 min-w-0 lg:overflow-y-auto pb-8">
+
+        {/* ── Order Summary Banner ── */}
+        <div className="pt-6">
+          <OrderSummary
+            locationName={locName}
+            date={slotDate}
+            time={slotTime}
+            locale={locale}
+            onChange={() => { setStep("location"); setActiveCat(null); }}
+          />
+        </div>
 
         {/* ── Hero Header ── */}
-        <div className="px-6 pt-8 pb-2">
+        <div className="px-6 pt-4 pb-2">
           <div className="flex items-end justify-between mb-1">
             <div>
-              <h1 className="font-display text-[56px] md:text-[80px] leading-[0.85] uppercase text-neon-pink tracking-tight">
+              <h1 className="font-display text-[56px] md:text-[80px] leading-[0.85] uppercase text-logo-red tracking-tight">
                 {isNl ? "MENU" : "MENU"}
               </h1>
-              <p className="text-lime text-[11px] font-mono tracking-[0.18em] uppercase mt-2">
+              <p className="text-logo-gold text-[11px] font-mono tracking-[0.18em] uppercase mt-2">
                 {isNl
-                  ? "Authentieke straatvoedsel smaken / vers dagelijks"
+                  ? "Authentic street food flavours / fresh daily"
                   : "Authentic street food flavours / fresh daily"}
               </p>
             </div>
             <button
               onClick={() => setDietaryFilter(dietaryFilter.length > 0 ? [] : allDietaryTags.slice(0, 1))}
-              className="flex items-center gap-2 px-4 py-2.5 border border-white/15 text-white/70 text-[11px] font-mono uppercase tracking-[0.1em] hover:border-white/30 hover:text-white transition-colors"
+              className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 text-foreground/70 text-[11px] font-mono uppercase tracking-[0.1em] hover:border-border-default hover:text-foreground transition-colors"
             >
               <SlidersHorizontal className="w-3.5 h-3.5" />
               {isNl ? "Filter" : "Filter"}
@@ -347,8 +446,8 @@ export default function OrderPage() {
                   onClick={() => toggleDietary(tag)}
                   className={`px-2.5 py-1 text-[10px] font-mono uppercase tracking-[0.08em] border transition-colors ${
                     dietaryFilter.includes(tag)
-                      ? "bg-neon-pink border-neon-pink text-black"
-                      : "border-white/10 text-gray-500 hover:border-white/25 hover:text-gray-300"
+                      ? "bg-logo-red border-logo-red text-black"
+                      : "border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-400"
                   }`}
                 >
                   {tag}
@@ -362,24 +461,53 @@ export default function OrderPage() {
         <div className="px-6 pb-4 flex items-center gap-2 text-gray-500 text-[11px] font-mono">
           <MapPin className="w-3 h-3" />
           <span>{locName}</span>
-          <span className="text-gray-700">·</span>
+          <span className="text-gray-400">·</span>
           <Clock className="w-3 h-3" />
           <span>{slotDate} {slotTime}</span>
           <button
             onClick={() => { setStep("location"); setActiveCat(null); }}
-            className="ml-auto text-neon-pink hover:text-white transition-colors underline underline-offset-2"
+            className="ml-auto text-logo-red hover:text-foreground transition-colors underline underline-offset-2"
           >
             {isNl ? "Wijzigen" : "Change"}
           </button>
+        </div>
+
+        {/* ── Category pills ── */}
+        <div className="px-6 pb-4">
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+            <button
+              onClick={() => setActiveCat(null)}
+              className={`shrink-0 px-4 py-2 text-[11px] font-bold font-mono uppercase tracking-[0.1em] border transition-colors ${
+                activeCat === null
+                  ? "bg-logo-red border-logo-red text-black"
+                  : "bg-white border-gray-200 text-foreground hover:border-gray-300"
+              }`}
+            >
+              {isNl ? "Alles" : "All"}
+            </button>
+            {categories.map((cat) => (
+              <button
+                key={cat.id}
+                onClick={() => setActiveCat(activeCat === cat.id ? null : cat.id)}
+                className={`shrink-0 px-4 py-2 text-[11px] font-bold font-mono uppercase tracking-[0.1em] border transition-colors ${
+                  activeCat === cat.id
+                    ? "bg-logo-red border-logo-red text-black"
+                    : "bg-white border-gray-200 text-foreground hover:border-gray-300"
+                }`}
+              >
+                {cat.name}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* ── Category sections ── */}
         <div className="px-6 pb-12 space-y-10">
           {filteredCategories.map((cat, catIdx) => {
             const isEven = catIdx % 2 === 0; // 0,2 = pink; 1,3 = lime
-            const headerColor = isEven ? "text-white" : "text-lime";
-            const priceTagBg = isEven ? "bg-neon-pink" : "bg-lime";
-            const numColor = isEven ? "text-neon-pink" : "text-lime";
+            const headerColor = isEven ? "text-foreground" : "text-logo-gold";
+            const priceTagBg = isEven ? "bg-logo-red" : "bg-logo-gold";
+            const numColor = isEven ? "text-logo-red" : "text-logo-gold";
             const isLast = catIdx === filteredCategories.length - 1;
             const itemCount = cat.items.length + (isLast ? 1 : 0); // +1 for promo card
 
@@ -388,7 +516,7 @@ export default function OrderPage() {
                 {/* Section header */}
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-1.5 h-7 bg-neon-pink shrink-0" />
+                    <div className="w-1.5 h-7 bg-logo-red shrink-0" />
                     <h2 className={`font-display text-[22px] md:text-[26px] uppercase tracking-tight ${headerColor}`}>
                       {cat.name}
                     </h2>
@@ -411,99 +539,125 @@ export default function OrderPage() {
                       ? item.salePrice
                       : item.price;
 
+                    const isUnavailable = !item.isAvailable;
+                    const canAddToCart = item.isAvailable && !item.isDineInOnly;
+
                     return (
-                      <button
+                      <div
                         key={item.id}
-                        onClick={() => {
-                          setSelectedItem(item);
-                          setSelectedVariant("");
-                          setSelectedModifiers([]);
-                        }}
-                        className="group text-left w-full"
+                        className={`group text-left w-full ${isUnavailable ? "opacity-60" : ""}`}
                       >
-                        {/* Image + price tag */}
-                        <div className="relative aspect-[4/3] overflow-hidden bg-surface-container">
+                        {/* Image */}
+                        <div
+                          className={`relative aspect-[4/3] overflow-hidden bg-surface-container ${canAddToCart ? "cursor-pointer" : "cursor-not-allowed"}`}
+                          onClick={() => {
+                            if (!canAddToCart) return;
+                            setSelectedItem(item);
+                            setSelectedVariant(item.variants[0]?.id || "");
+                            setSelectedModifiers([]);
+                            setSelectedExclusions([]);
+                          }}
+                        >
                           {img ? (
                             <img
                               src={img}
                               alt={name}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                              className={`w-full h-full object-cover ${item.isAvailable ? "group-hover:scale-105 transition-transform duration-700" : "grayscale"}`}
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center bg-surface-container">
-                              <Utensils className="w-8 h-8 text-gray-700" />
+                              <Utensils className="w-8 h-8 text-gray-400" />
                             </div>
                           )}
-                          {/* Price tag */}
-                          <div
-                            className={`absolute top-3 right-3 px-2.5 py-1 ${priceTagBg} text-black font-bold font-mono text-[11px] leading-none`}
-                          >
-                            {fmtPrice(displayPrice)}
-                          </div>
+                          {isUnavailable && (
+                            <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+                              <span className="bg-black/70 text-white text-[10px] font-bold font-mono uppercase tracking-[0.1em] px-3 py-1.5">
+                                {isNl ? "Niet beschikbaar" : "Not available"}
+                              </span>
+                            </div>
+                          )}
+                          {item.isAvailable && item.isDineInOnly && (
+                            <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+                              <span className="bg-brand-gold/90 text-black text-[10px] font-bold font-mono uppercase tracking-[0.1em] px-3 py-1.5">
+                                {isNl ? "Alleen Dine-In" : "Dine-In only"}
+                              </span>
+                            </div>
+                          )}
                         </div>
 
                         {/* Info */}
-                        <div className="pt-3 pb-1">
+                        <div
+                          className={`pt-3 pb-1 ${canAddToCart ? "cursor-pointer" : "cursor-not-allowed"}`}
+                          onClick={() => {
+                            if (!canAddToCart) return;
+                            setSelectedItem(item);
+                            setSelectedVariant(item.variants[0]?.id || "");
+                            setSelectedModifiers([]);
+                            setSelectedExclusions([]);
+                          }}
+                        >
                           <div className="flex items-center gap-1.5">
-                            <h3 className="font-bold text-white text-[14px] uppercase tracking-wide leading-tight">
+                            <h3 className={`font-bold text-[14px] uppercase tracking-wide leading-tight ${isUnavailable ? "text-gray-400" : "text-foreground"}`}>
                               {name}
                             </h3>
-                            {item.isSpicy && (
+                            {item.isSpicy && !isUnavailable && (
                               <Flame className="w-3.5 h-3.5 text-red-500 shrink-0" />
                             )}
                           </div>
-                          <p className="text-[12px] text-gray-500 mt-1 leading-relaxed line-clamp-2">
+                          <p className={`text-[12px] mt-1 leading-relaxed line-clamp-2 ${isUnavailable ? "text-gray-400" : "text-gray-500"}`}>
                             {desc}
                           </p>
 
-                          {/* Tags + cart qty */}
+                          {/* Price + quick-add row */}
                           <div className="flex items-center justify-between mt-2">
+                            <span className={`font-bold text-[14px] font-mono ${isUnavailable ? "text-gray-400" : "text-foreground"}`}>
+                              {fmtPrice(displayPrice)}
+                            </span>
+                            {canAddToCart ? (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleQuickAdd(item);
+                                }}
+                                className="w-7 h-7 border border-logo-red text-logo-red flex items-center justify-center hover:bg-logo-red hover:text-black transition-all"
+                              >
+                                <Plus className="w-4 h-4" />
+                              </button>
+                            ) : item.isDineInOnly && item.isAvailable ? (
+                              <span className="text-[10px] font-mono text-brand-gold uppercase tracking-wider">
+                                {isNl ? "Alleen Dine-In" : "Dine-In only"}
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-mono text-gray-400 uppercase tracking-wider">
+                                {isNl ? "Uitverkocht" : "Sold out"}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Tags + cart qty */}
+                          <div className="flex items-center justify-between mt-1.5">
                             <div className="flex flex-wrap gap-x-2 gap-y-0.5">
                               {item.dietaryTags.map((tag) => (
                                 <span
                                   key={tag}
-                                  className="text-[9px] text-gray-600 uppercase tracking-wider font-mono"
+                                  className="text-[9px] text-gray-400 uppercase tracking-wider font-mono"
                                 >
                                   {tag}
                                 </span>
                               ))}
                             </div>
                             {inCartQty > 0 && (
-                              <span className="text-[10px] font-mono text-neon-pink font-bold">
+                              <span className="text-[10px] font-mono text-logo-red font-bold">
                                 {inCartQty}x in cart
                               </span>
                             )}
                           </div>
                         </div>
-                      </button>
+                      </div>
                     );
                   })}
 
-                  {/* Promo card on last category */}
-                  {isLast && (
-                    <div className="relative bg-neon-pink flex flex-col items-center justify-center text-center p-6 aspect-[4/3]">
-                      <Utensils className="w-10 h-10 text-black/30" />
-                      <h3 className="font-display text-[18px] uppercase text-black tracking-tight mt-4 leading-none">
-                        {isNl ? "Nog meer trek?" : "Hungry for more?"}
-                      </h3>
-                      <p className="text-[12px] text-black/70 mt-2 max-w-[200px]">
-                        {isNl
-                          ? "Ontdek ons volledige aanbod straatvoedsel klassiekers."
-                          : "Discover our full range of street food classics and authentic drinks."}
-                      </p>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setActiveCat(null);
-                          const el = document.querySelector(".overflow-y-auto");
-                          el?.scrollTo({ top: 0, behavior: "smooth" });
-                        }}
-                        className="mt-5 px-5 py-2.5 bg-black text-white text-[11px] font-bold font-mono uppercase tracking-[0.1em] hover:bg-black/80 transition-colors"
-                      >
-                        {isNl ? "Bekijk volledig menu" : "View Full Menu"}
-                      </button>
-                    </div>
-                  )}
+
                 </div>
               </section>
             );
@@ -511,10 +665,11 @@ export default function OrderPage() {
         </div>
       </div>
 
-      {/* ═══════ RIGHT PANEL — CART ═══════ */}
-      <div className="w-full lg:w-[340px] shrink-0 border-l border-white/10 bg-surface flex flex-col">
-        <div className="px-5 py-5 border-b border-white/10">
-          <h2 className="font-display text-[20px] uppercase tracking-tight text-white">
+      {/* ═══════ DESKTOP CART SIDEBAR ═══════ */}
+      {/* Desktop: always visible sidebar */}
+      <div className="hidden lg:flex w-[340px] shrink-0 border-l border-gray-200 bg-surface flex-col">
+        <div className="px-5 py-5 border-b border-gray-200">
+          <h2 className="font-display text-[20px] uppercase tracking-tight text-foreground">
             {isNl ? "Mijn bestelling" : "My Order"}
           </h2>
           <p className="font-mono text-[11px] text-gray-500 mt-1 flex items-center gap-1">
@@ -527,25 +682,25 @@ export default function OrderPage() {
         <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4">
           {cartItems.length === 0 ? (
             <div className="text-center py-16">
-              <ShoppingCart className="w-10 h-10 text-gray-700 mx-auto mb-3" />
+              <ShoppingCart className="w-10 h-10 text-gray-400 mx-auto mb-3" />
               <p className="text-gray-500 text-[13px] font-mono">
                 {isNl ? "Je winkelwagen is leeg" : "Your cart is empty"}
               </p>
-              <p className="text-gray-600 text-[11px] mt-1 font-mono">
+              <p className="text-gray-400 text-[11px] mt-1 font-mono">
                 {isNl ? "Tap een gerecht om toe te voegen" : "Tap a dish to add it"}
               </p>
             </div>
           ) : (
             cartItems.map((item) => (
-              <div key={`${item.menuItemId}-${item.variantId || "v"}-${(item.modifierIds || []).join(",")}`} className="flex items-center gap-3">
+              <div key={`${item.menuItemId}-${item.variantId || "v"}-${(item.modifierIds || []).join(",")}-${(item.exclusionIds || []).join(",")}`} className="flex items-center gap-3">
                 <div className="flex items-center gap-1.5 shrink-0">
                   <button
                     onClick={() => decreaseItem(item.menuItemId)}
-                    className="w-7 h-7 border border-white/15 flex items-center justify-center text-gray-400 hover:text-white hover:border-white/30 transition-colors"
+                    className="w-7 h-7 border border-gray-200 flex items-center justify-center text-gray-400 hover:text-foreground hover:border-border-default transition-colors"
                   >
                     <Minus className="w-3 h-3" />
                   </button>
-                  <span className="text-white font-bold text-[13px] w-5 text-center">{item.quantity}</span>
+                  <span className="text-foreground font-bold text-[13px] w-5 text-center">{item.quantity}</span>
                   <button
                     onClick={() =>
                       addItem({
@@ -556,15 +711,17 @@ export default function OrderPage() {
                         variantName: item.variantName,
                         modifierIds: item.modifierIds,
                         modifierNames: item.modifierNames,
+                        exclusionIds: item.exclusionIds,
+                        exclusionNames: item.exclusionNames,
                       })
                     }
-                    className="w-7 h-7 bg-neon-pink flex items-center justify-center text-black hover:brightness-110 transition-all"
+                    className="w-7 h-7 bg-logo-red flex items-center justify-center text-black hover:brightness-110 transition-all"
                   >
                     <Plus className="w-3 h-3" />
                   </button>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-white text-[13px] truncate">{item.name}</p>
+                  <p className="text-foreground text-[13px] truncate">{item.name}</p>
                   {item.variantName && (
                     <p className="text-[10px] text-gray-500">{item.variantName}</p>
                   )}
@@ -573,8 +730,13 @@ export default function OrderPage() {
                       {item.modifierNames.join(", ")}
                     </p>
                   )}
+                  {item.exclusionNames && item.exclusionNames.length > 0 && (
+                    <p className="text-[10px] text-brand-gold truncate">
+                      {item.exclusionNames.join(", ")}
+                    </p>
+                  )}
                 </div>
-                <span className="text-gray-300 text-[13px] shrink-0 font-mono">
+                <span className="text-gray-400 text-[13px] shrink-0 font-mono">
                   {fmtPrice(item.price * item.quantity)}
                 </span>
               </div>
@@ -584,16 +746,16 @@ export default function OrderPage() {
 
         {/* Footer */}
         {cartItems.length > 0 && (
-          <div className="px-5 py-5 border-t border-white/10 space-y-4">
+          <div className="px-5 py-5 border-t border-gray-200 space-y-4">
             <div className="flex items-center justify-between">
               <span className="font-mono text-[12px] text-gray-400 uppercase tracking-wide">
                 {isNl ? "Totaal" : "Total"}
               </span>
-              <span className="text-white text-[26px] font-bold">{fmtPrice(cartTotal)}</span>
+              <span className="text-foreground text-[26px] font-bold">{fmtPrice(cartTotal)}</span>
             </div>
             <Link
               href={`/${locale}/checkout`}
-              className="block w-full py-4 bg-neon-pink text-black font-bold text-center text-[13px] tracking-[0.08em] uppercase hover:brightness-110 transition-all"
+              className="block w-full py-4 bg-logo-red text-black font-bold text-center text-[13px] tracking-[0.08em] uppercase hover:brightness-110 transition-all"
             >
               {isNl ? "AFREKENEN" : "CHECKOUT"} &rarr;
             </Link>
@@ -601,23 +763,166 @@ export default function OrderPage() {
         )}
       </div>
 
+      {/* ═══════ MOBILE CART FAB ═══════ */}
+      {/* Mobile: floating cart button with badge */}
+      <button
+        onClick={() => setCartOpen(true)}
+        className="lg:hidden fixed bottom-6 right-6 z-40 w-14 h-14 flex items-center justify-center bg-logo-red transition-all shadow-lg"
+        style={{ borderRadius: "50%" }}
+      >
+        <ShoppingCart className="w-6 h-6 text-black" />
+        {cartCount > 0 && (
+          <span
+            className="absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center bg-white text-black font-bold text-[11px]"
+            style={{ borderRadius: "50%" }}
+          >
+            {cartCount}
+          </span>
+        )}
+      </button>
+
+      {/* ═══════ MOBILE CART DRAWER ═══════ */}
+
+      {/* ═══════ MOBILE CART DRAWER ═══════ */}
+      {cartOpen && (
+        <div className="lg:hidden fixed inset-0 z-50 flex flex-col justify-end">
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/80" onClick={() => setCartOpen(false)} />
+          {/* Drawer */}
+          <div className="relative bg-surface border-t border-gray-200 w-full max-h-[80vh] flex flex-col">
+            {/* Drag handle */}
+            <div className="flex justify-center py-3">
+              <div
+                className="w-10 h-1 bg-white/20"
+                onClick={() => setCartOpen(false)}
+                style={{ borderRadius: "4px" }}
+              />
+            </div>
+
+            {/* Header */}
+            <div className="px-5 pb-3 flex items-center justify-between">
+              <div>
+                <h2 className="font-display text-[20px] uppercase tracking-tight text-foreground">
+                  {isNl ? "Mijn bestelling" : "My Order"}
+                </h2>
+                <p className="font-mono text-[11px] text-gray-500 mt-1 flex items-center gap-1">
+                  <MapPin className="w-3 h-3" />
+                  {isNl ? "Lokaal afhalen" : "Take Out"} &middot; {locName}
+                </p>
+              </div>
+              <button
+                onClick={() => setCartOpen(false)}
+                className="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-foreground transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Cart items */}
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+              {cartItems.length === 0 ? (
+                <div className="text-center py-12">
+                  <ShoppingCart className="w-10 h-10 text-gray-400 mx-auto mb-3" />
+                  <p className="text-gray-500 text-[13px] font-mono">
+                    {isNl ? "Je winkelwagen is leeg" : "Your cart is empty"}
+                  </p>
+                  <p className="text-gray-400 text-[11px] mt-1 font-mono">
+                    {isNl ? "Tap een gerecht om toe te voegen" : "Tap a dish to add it"}
+                  </p>
+                </div>
+              ) : (
+                cartItems.map((item) => (
+                  <div key={`${item.menuItemId}-${item.variantId || "v"}-${(item.modifierIds || []).join(",")}-${(item.exclusionIds || []).join(",")}`} className="flex items-center gap-3">
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        onClick={() => decreaseItem(item.menuItemId)}
+                        className="w-7 h-7 border border-gray-200 flex items-center justify-center text-gray-400 hover:text-foreground hover:border-border-default transition-colors"
+                      >
+                        <Minus className="w-3 h-3" />
+                      </button>
+                      <span className="text-foreground font-bold text-[13px] w-5 text-center">{item.quantity}</span>
+                      <button
+                        onClick={() =>
+                          addItem({
+                            menuItemId: item.menuItemId,
+                            name: item.name,
+                            price: item.price,
+                            variantId: item.variantId,
+                            variantName: item.variantName,
+                            modifierIds: item.modifierIds,
+                            modifierNames: item.modifierNames,
+                            exclusionIds: item.exclusionIds,
+                            exclusionNames: item.exclusionNames,
+                          })
+                        }
+                        className="w-7 h-7 bg-logo-red flex items-center justify-center text-black hover:brightness-110 transition-all"
+                      >
+                        <Plus className="w-3 h-3" />
+                      </button>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-foreground text-[13px] truncate">{item.name}</p>
+                      {item.variantName && (
+                        <p className="text-[10px] text-gray-500">{item.variantName}</p>
+                      )}
+                      {item.modifierNames && item.modifierNames.length > 0 && (
+                        <p className="text-[10px] text-gray-500 truncate">
+                          {item.modifierNames.join(", ")}
+                        </p>
+                      )}
+                      {item.exclusionNames && item.exclusionNames.length > 0 && (
+                        <p className="text-[10px] text-brand-gold truncate">
+                          {item.exclusionNames.join(", ")}
+                        </p>
+                      )}
+                    </div>
+                    <span className="text-gray-400 text-[13px] shrink-0 font-mono">
+                      {fmtPrice(item.price * item.quantity)}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Footer */}
+            {cartItems.length > 0 && (
+              <div className="px-5 py-5 border-t border-gray-200 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-[12px] text-gray-400 uppercase tracking-wide">
+                    {isNl ? "Totaal" : "Total"}
+                  </span>
+                  <span className="text-foreground text-[26px] font-bold">{fmtPrice(cartTotal)}</span>
+                </div>
+                <Link
+                  href={`/${locale}/checkout`}
+                  className="block w-full py-4 bg-logo-red text-black font-bold text-center text-[13px] tracking-[0.08em] uppercase hover:brightness-110 transition-all"
+                  onClick={() => setCartOpen(false)}
+                >
+                  {isNl ? "AFREKENEN" : "CHECKOUT"} &rarr;
+                </Link>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ═══════ ITEM MODAL ═══════ */}
       {selectedItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/80" onClick={() => setSelectedItem(null)} />
-          <div className="relative bg-surface-container border border-white/15 w-full max-w-[440px] max-h-[90vh] overflow-y-auto">
+          <div className="relative bg-surface-container border border-gray-200 w-full max-w-[440px] max-h-[90vh] overflow-y-auto">
             {/* Image */}
             <div className="h-52 w-full relative">
               {selectedItem.imageUrl ? (
                 <img src={selectedItem.imageUrl} alt={selectedItem.name} className="w-full h-full object-cover" />
               ) : (
-                <div className="w-full h-full bg-surface flex items-center justify-center text-gray-600">
+                <div className="w-full h-full bg-surface flex items-center justify-center text-gray-400">
                   <Utensils className="w-12 h-12" />
                 </div>
               )}
               <button
                 onClick={() => setSelectedItem(null)}
-                className="absolute top-3 right-3 w-8 h-8 bg-black/70 text-white flex items-center justify-center hover:bg-black/90 transition-colors border border-white/20"
+                className="absolute top-3 right-3 w-8 h-8 bg-black/70 text-foreground flex items-center justify-center hover:bg-black/90 transition-colors border border-gray-200"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -627,7 +932,7 @@ export default function OrderPage() {
               {/* Title + price */}
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-display text-[20px] uppercase tracking-tight text-white leading-none">
+                  <h3 className="font-display text-[20px] uppercase tracking-tight text-foreground leading-none">
                     {isNl && selectedItem.nameNl ? selectedItem.nameNl : selectedItem.name}
                   </h3>
                   <p className="text-[13px] text-gray-400 mt-1.5">
@@ -644,34 +949,42 @@ export default function OrderPage() {
               {/* Variants */}
               {selectedItem.variants.length > 0 && (
                 <div className="space-y-2.5">
-                  <label className="font-mono text-[10px] text-gray-500 uppercase tracking-[0.1em]">
-                    {isNl ? "Kies een optie" : "Choose an option"}
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      onClick={() => setSelectedVariant("")}
-                      className={`px-3 py-2 border text-[13px] transition-colors ${
-                        !selectedVariant
-                          ? "border-neon-pink bg-neon-pink/10 text-white"
-                          : "border-white/15 text-gray-300 hover:border-white/30"
-                      }`}
-                    >
-                      Regular
-                    </button>
-                    {selectedItem.variants.map((v) => (
-                      <button
-                        key={v.id}
-                        onClick={() => setSelectedVariant(v.id)}
-                        className={`px-3 py-2 border text-[13px] transition-colors ${
-                          selectedVariant === v.id
-                            ? "border-neon-pink bg-neon-pink/10 text-white"
-                            : "border-white/15 text-gray-300 hover:border-white/30"
-                        }`}
-                      >
-                        {isNl && v.nameNl ? v.nameNl : v.name}{" "}
-                        {v.price > 0 ? `(+${fmtPrice(v.price)})` : ""}
-                      </button>
-                    ))}
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-full bg-logo-red/10 flex items-center justify-center">
+                      <Utensils className="w-3.5 h-3.5 text-logo-red" />
+                    </div>
+                    <label className="font-mono text-[10px] text-gray-500 uppercase tracking-[0.1em]">
+                      {isNl ? "Kies je optie" : "Choose an option"}
+                    </label>
+                    <div className="flex-1 h-px bg-border-default" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {selectedItem.variants.map((v) => {
+                      const isSelected = selectedVariant === v.id;
+                      return (
+                        <button
+                          key={v.id}
+                          onClick={() => setSelectedVariant(v.id)}
+                          className={`relative px-3 py-2.5 border rounded-lg text-[13px] font-medium transition-colors text-left ${
+                            isSelected
+                              ? "border-logo-red bg-logo-red/10 text-foreground"
+                              : "border-gray-200 text-gray-500 hover:border-border-default"
+                          }`}
+                        >
+                          <span className="flex items-center justify-between">
+                            <span>{isNl && v.nameNl ? v.nameNl : v.name}</span>
+                            {isSelected && (
+                              <span className="w-4 h-4 rounded-full bg-logo-red flex items-center justify-center shrink-0 ml-1">
+                                <Check className="w-2.5 h-2.5 text-white" />
+                              </span>
+                            )}
+                          </span>
+                          {v.price > 0 && (
+                            <span className="text-[11px] text-gray-400 block mt-0.5">+{fmtPrice(v.price)}</span>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -679,9 +992,15 @@ export default function OrderPage() {
               {/* Modifiers */}
               {selectedItem.modifiers.length > 0 && (
                 <div className="space-y-2.5">
-                  <label className="font-mono text-[10px] text-gray-500 uppercase tracking-[0.1em]">
-                    {isNl ? "Extras" : "Add-ons"}
-                  </label>
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-full bg-logo-red/10 flex items-center justify-center">
+                      <Plus className="w-3.5 h-3.5 text-logo-red" />
+                    </div>
+                    <label className="font-mono text-[10px] text-gray-500 uppercase tracking-[0.1em]">
+                      {isNl ? "Extras" : "Add-ons"}
+                    </label>
+                    <div className="flex-1 h-px bg-border-default" />
+                  </div>
                   <div className="space-y-2">
                     {selectedItem.modifiers.map((m) => {
                       const checked = selectedModifiers.includes(m.id);
@@ -691,19 +1010,19 @@ export default function OrderPage() {
                           onClick={() => toggleModifier(m.id)}
                           className={`w-full flex items-center justify-between p-3 border text-left transition-colors ${
                             checked
-                              ? "border-neon-pink bg-neon-pink/10"
-                              : "border-white/15 hover:border-white/30"
+                              ? "border-logo-red bg-logo-red/10"
+                              : "border-gray-200 hover:border-border-default"
                           }`}
                         >
                           <div className="flex items-center gap-3">
                             <div
                               className={`w-5 h-5 border flex items-center justify-center transition-colors ${
-                                checked ? "bg-neon-pink border-neon-pink" : "border-gray-500"
+                                checked ? "bg-logo-red border-logo-red" : "border-gray-500"
                               }`}
                             >
                               {checked && <Check className="w-3 h-3 text-black" />}
                             </div>
-                            <span className="text-white text-[13px]">
+                            <span className="text-foreground text-[13px]">
                               {isNl && m.nameNl ? m.nameNl : m.name}
                             </span>
                           </div>
@@ -717,10 +1036,54 @@ export default function OrderPage() {
                 </div>
               )}
 
+              {selectedItem.exclusions.length > 0 && (
+                <div className="space-y-2.5">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-full bg-logo-gold/10 flex items-center justify-center">
+                      <Utensils className="w-3.5 h-3.5 text-brand-gold" />
+                    </div>
+                    <label className="font-mono text-[10px] text-gray-500 uppercase tracking-[0.1em]">
+                      {isNl ? "Maak je gerechtje" : "Customize your dish"}
+                    </label>
+                    <div className="flex-1 h-px bg-border-default" />
+                  </div>
+                  <p className="text-[11px] text-gray-400">
+                    {isNl ? "Vink je voorkeur aan." : "Tick your preferences."}
+                  </p>
+                  <div className="space-y-2">
+                    {selectedItem.exclusions.map((e) => {
+                      const checked = selectedExclusions.includes(e.id);
+                      return (
+                        <button
+                          key={e.id}
+                          onClick={() => toggleExclusion(e.id)}
+                          className={`w-full flex items-center gap-3 p-3 border text-left transition-colors ${
+                            checked
+                              ? "border-brand-gold bg-logo-gold/10"
+                              : "border-gray-200 hover:border-border-default"
+                          }`}
+                        >
+                          <div
+                            className={`w-5 h-5 border flex items-center justify-center transition-colors ${
+                              checked ? "bg-brand-gold border-brand-gold" : "border-gray-500"
+                            }`}
+                          >
+                            {checked && <Check className="w-3 h-3 text-white" />}
+                          </div>
+                          <span className="text-foreground text-[13px]">
+                            {isNl && e.nameNl ? e.nameNl : e.name}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* Add button */}
               <button
                 onClick={() => handleAdd(selectedItem)}
-                className="w-full py-4 bg-neon-pink text-black font-bold text-[13px] tracking-[0.08em] uppercase hover:brightness-110 transition-all flex items-center justify-center gap-2"
+                className="w-full py-4 bg-logo-red text-black font-bold text-[13px] tracking-[0.08em] uppercase hover:brightness-110 transition-all flex items-center justify-center gap-2"
               >
                 <Plus className="w-5 h-5" />
                 {isNl ? "Toevoegen" : "Add to order"} &middot; {fmtPrice(getItemPrice(selectedItem) + getModifierTotal(selectedItem))}

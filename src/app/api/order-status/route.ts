@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
     include: {
       location: { select: { name: true } },
       pickupSlot: { select: { date: true, time: true } },
-      items: { include: { menuItem: { select: { name: true } } } },
+      items: { include: { menuItem: { select: { name: true, shortDescription: true, shortDescriptionNl: true, imageUrl: true, imageUrls: true } } } },
     },
   });
 
@@ -52,8 +52,15 @@ export async function GET(req: NextRequest) {
     createdAt: order.createdAt.toISOString(),
     items: order.items.map((i) => ({
       name: i.menuItem.name,
+      shortDescription: i.menuItem.shortDescription,
+      shortDescriptionNl: i.menuItem.shortDescriptionNl,
       quantity: i.quantity,
       price: i.price,
+      imageUrl: i.menuItem.imageUrl,
+      imageUrls: i.menuItem.imageUrls,
+      variantName: i.variantName,
+      modifierNames: i.modifierNames,
+      exclusionNames: i.exclusionNames,
     })),
     location: order.location,
     pickupSlot: order.pickupSlot,

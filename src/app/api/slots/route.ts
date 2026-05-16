@@ -19,7 +19,11 @@ export async function GET(req: Request) {
     select: { id: true, date: true, time: true, capacity: true, booked: true },
   });
 
-  const slots = slotsRaw.filter((s) => s.booked < s.capacity);
+  const slots = slotsRaw.map((s) => ({
+    id: s.id,
+    date: s.date.toISOString().split("T")[0], // YYYY-MM-DD
+    time: s.time,
+  }));
 
   return NextResponse.json(slots);
 }

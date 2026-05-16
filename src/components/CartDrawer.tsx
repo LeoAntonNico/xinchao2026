@@ -14,16 +14,16 @@ export default function CartDrawer() {
   return (
     <>
       <div
-        className="fixed inset-0 bg-black/60 z-40"
+        className="fixed inset-0 bg-black/30 z-40"
         onClick={() => setIsOpen(false)}
       />
-      <div className="fixed right-0 top-0 bottom-0 w-full max-w-md bg-background border-l border-border-default z-50 flex flex-col">
+      <div className="fixed right-0 top-0 bottom-0 w-full max-w-md bg-surface border-l border-border-default z-50 flex flex-col">
         <div className="flex items-center justify-between p-4 border-b border-border-default">
-          <h2 className="text-lg font-bold text-white flex items-center gap-2">
+          <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
             <ShoppingBag className="w-5 h-5 text-brand-gold" />
             Your Order
           </h2>
-          <button onClick={() => setIsOpen(false)} className="p-1 text-gray-400 hover:text-white">
+          <button onClick={() => setIsOpen(false)} className="p-1 text-gray-400 hover:text-foreground">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -33,22 +33,22 @@ export default function CartDrawer() {
             <p className="text-gray-400 text-center py-8">Your cart is empty</p>
           ) : (
             items.map((item) => (
-              <div key={item.menuItemId} className="flex items-center justify-between bg-sidebar rounded-lg p-3">
+              <div key={item.menuItemId} className="flex items-center justify-between bg-surface-container rounded-lg p-3">
                 <div>
-                  <p className="font-medium text-white text-sm">{item.name}</p>
-                  <p className="text-gray-400 text-sm">€{((item.price * item.quantity) / 100).toFixed(2).replace(".", ",")}</p>
+                  <p className="font-medium text-foreground text-sm">{item.name}</p>
+                  <p className="text-gray-500 text-sm">€{((item.price * item.quantity) / 100).toFixed(2).replace(".", ",")}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => updateQuantity(item.menuItemId, item.quantity - 1)}
-                    className="w-7 h-7 rounded bg-gray-700 text-white flex items-center justify-center hover:bg-gray-600"
+                    className="w-7 h-7 rounded bg-gray-200 text-foreground flex items-center justify-center hover:bg-gray-300"
                   >
                     <Minus className="w-3 h-3" />
                   </button>
-                  <span className="text-white w-6 text-center text-sm">{item.quantity}</span>
+                  <span className="text-foreground w-6 text-center text-sm">{item.quantity}</span>
                   <button
                     onClick={() => updateQuantity(item.menuItemId, item.quantity + 1)}
-                    className="w-7 h-7 rounded bg-gray-700 text-white flex items-center justify-center hover:bg-gray-600"
+                    className="w-7 h-7 rounded bg-gray-200 text-foreground flex items-center justify-center hover:bg-gray-300"
                   >
                     <Plus className="w-3 h-3" />
                   </button>
@@ -60,14 +60,14 @@ export default function CartDrawer() {
 
         {items.length > 0 && (
           <div className="p-4 border-t border-border-default space-y-3">
-            <div className="flex justify-between text-white">
+            <div className="flex justify-between text-foreground">
               <span className="font-medium">Total</span>
               <span className="font-bold text-brand-gold">€{(total / 100).toFixed(2).replace(".", ",")}</span>
             </div>
             <Link
               href={`/${locale}/order`}
               onClick={() => setIsOpen(false)}
-              className="block w-full text-center py-3 bg-brand-red text-white rounded-lg font-medium hover:bg-[#a01830] transition-colors"
+              className="block w-full text-center py-3 bg-brand-red text-white rounded-lg font-medium hover:bg-logo-red-hover transition-colors"
             >
               Checkout
             </Link>

@@ -13,10 +13,9 @@ export async function GET(req: Request) {
       items: {
         where: {
           locations: { some: { id: locationId } },
-          isAvailable: true,
         },
         orderBy: { sortOrder: "asc" },
-        include: { variants: { orderBy: { sortOrder: "asc" } }, modifiers: { orderBy: { sortOrder: "asc" } } },
+        include: { variants: { orderBy: { sortOrder: "asc" } }, modifiers: { orderBy: { sortOrder: "asc" } }, exclusions: { orderBy: { sortOrder: "asc" } } },
       },
     },
   });
@@ -36,8 +35,11 @@ export async function GET(req: Request) {
       imageUrl: item.imageUrl,
       dietaryTags: item.dietaryTags,
       isSpicy: item.isSpicy,
+      isAvailable: item.isAvailable,
+      isDineInOnly: item.isDineInOnly,
       variants: item.variants,
       modifiers: item.modifiers,
+      exclusions: item.exclusions,
     })),
   }));
 

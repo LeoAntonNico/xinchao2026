@@ -20,7 +20,7 @@ const http = require('http');
 const { URL } = require('url');
 
 // --- CONFIG ---
-const API_BASE = process.env.PRINT_API_URL?.replace(/\/$/, '') || 'http://localhost:3002';
+const API_BASE = (process.env.PRINT_API_URL || 'http://91.98.224.2:3000').replace(/\/$/, '');
 const AGENT_SECRET = process.env.PRINT_AGENT_SECRET || '';
 const PRINTER_IP = process.env.PRINTER_IP || '192.168.1.100';
 const PRINTER_PORT = Number(process.env.PRINTER_PORT || 9100);

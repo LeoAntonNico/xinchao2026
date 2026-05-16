@@ -127,13 +127,13 @@ export function ReservationModal({ isOpen, onClose, onSave, editingItem, locatio
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-start justify-center z-50 pt-20 overflow-y-auto pb-10">
-      <div className="bg-sidebar border border-border-default rounded-xl w-full max-w-lg mx-4 shadow-2xl">
+    <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-start justify-center z-50 pt-20 overflow-y-auto pb-10">
+      <div className="bg-white border border-border-default rounded-xl w-full max-w-lg mx-4 shadow-2xl">
         <div className="px-6 py-4 border-b border-border-default flex items-center justify-between">
-          <h2 className="text-lg font-bold text-white">
+          <h2 className="text-lg font-bold text-foreground">
             {editingItem ? "Edit Reservation" : "New Reservation"}
           </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white text-xl leading-none">
+          <button onClick={onClose} className="text-gray-400 hover:text-foreground text-xl leading-none">
             ×
           </button>
         </div>
@@ -152,7 +152,7 @@ export function ReservationModal({ isOpen, onClose, onSave, editingItem, locatio
                 type="text"
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
-                className="w-full bg-background border border-border-default rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-500"
+                className="w-full bg-background border border-border-default rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:border-gray-500"
                 placeholder="John Doe"
               />
             </div>
@@ -162,7 +162,7 @@ export function ReservationModal({ isOpen, onClose, onSave, editingItem, locatio
                 type="text"
                 value={customerPhone}
                 onChange={(e) => setCustomerPhone(e.target.value)}
-                className="w-full bg-background border border-border-default rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-500"
+                className="w-full bg-background border border-border-default rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:border-gray-500"
                 placeholder="+31 6..."
               />
             </div>
@@ -174,7 +174,7 @@ export function ReservationModal({ isOpen, onClose, onSave, editingItem, locatio
               type="email"
               value={customerEmail}
               onChange={(e) => setCustomerEmail(e.target.value)}
-              className="w-full bg-background border border-border-default rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-500"
+              className="w-full bg-background border border-border-default rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:border-gray-500"
               placeholder="john@example.com"
             />
           </div>
@@ -186,7 +186,7 @@ export function ReservationModal({ isOpen, onClose, onSave, editingItem, locatio
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="w-full bg-background border border-border-default rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-500"
+                className="w-full bg-background border border-border-default rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:border-gray-500"
               />
             </div>
             <div>
@@ -194,7 +194,7 @@ export function ReservationModal({ isOpen, onClose, onSave, editingItem, locatio
               <select
                 value={time}
                 onChange={(e) => setTime(e.target.value)}
-                className="w-full bg-background border border-border-default rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-500"
+                className="w-full bg-background border border-border-default rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:border-gray-500"
               >
                 {timeOptions.map((t) => (
                   <option key={t} value={t}>{t}</option>
@@ -208,7 +208,7 @@ export function ReservationModal({ isOpen, onClose, onSave, editingItem, locatio
                 min={1}
                 value={partySize}
                 onChange={(e) => setPartySize(e.target.value)}
-                className="w-full bg-background border border-border-default rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-500"
+                className="w-full bg-background border border-border-default rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:border-gray-500"
               />
             </div>
           </div>
@@ -219,7 +219,7 @@ export function ReservationModal({ isOpen, onClose, onSave, editingItem, locatio
               <select
                 value={locationId}
                 onChange={(e) => setLocationId(e.target.value)}
-                className="w-full bg-background border border-border-default rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-500"
+                className="w-full bg-background border border-border-default rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:border-gray-500"
               >
                 {locations.map((l) => (
                   <option key={l.id} value={l.id}>{l.name}</option>
@@ -231,7 +231,7 @@ export function ReservationModal({ isOpen, onClose, onSave, editingItem, locatio
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
-                className="w-full bg-background border border-border-default rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-500"
+                className="w-full bg-background border border-border-default rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:border-gray-500"
               >
                 <option value="CONFIRMED">CONFIRMED</option>
                 <option value="SEATED">SEATED</option>
@@ -247,7 +247,7 @@ export function ReservationModal({ isOpen, onClose, onSave, editingItem, locatio
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
-              className="w-full bg-background border border-border-default rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-500 resize-none"
+              className="w-full bg-background border border-border-default rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:border-gray-500 resize-none"
               placeholder="Allergies, special requests..."
             />
           </div>
@@ -256,14 +256,14 @@ export function ReservationModal({ isOpen, onClose, onSave, editingItem, locatio
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-lg text-sm text-gray-300 border border-border-default hover:bg-gray-700 transition-colors"
+              className="px-4 py-2 rounded-lg text-sm text-gray-500 border border-border-default hover:bg-gray-200 transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-red hover:bg-red-700 text-white transition-colors disabled:opacity-50"
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-red hover:bg-red-700 text-foreground transition-colors disabled:opacity-50"
             >
               {saving ? "Saving..." : editingItem ? "Update" : "Create"}
             </button>

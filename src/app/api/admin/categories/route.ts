@@ -61,3 +61,25 @@ export async function DELETE(request: NextRequest) {
   await prisma.menuCategory.delete({ where: { id } });
   return NextResponse.json({ success: true });
 }
+
+export async function PATCH(request: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  try {
+    const body = await request.json();
+    const { order } = body;
+    if (!Array.isArray(order)) return NextResponse.json({ error: "Invalid order" }, { status: 400 });
+
+    await prisma.$transaction(
+      order.map((id: string, index: number) =>
+        prisma.menuCategory.update({ where: { id }, data: { sortOrder: index } })
+      )
+    );
+
+    return NextResponse.json({ success: true });
+  } catch (e: unknown) {
+    console.error("Category reorder error:", e);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  }
+}

@@ -1,0 +1,1 @@
+UPDATE "Location" SET "mapEmbedUrl" = 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2451.3926136781292!2d5.6626673!3d51.9654739!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2sXin%20Ch%C3%A0o%20Wageningen!5e0!3m2!1sen!2sus!4v1778598915866!5m2!1sen!2sus' WHERE name ILIKE '%wageningen%';

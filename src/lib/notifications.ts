@@ -1,18 +1,45 @@
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 
-const resend = new Resend(process.env.RESEND_API_KEY ?? "re_xxxxxxxx");
+const smtpHost = process.env.SMTP_HOST ?? "smtp.transip.email";
+const smtpPort = parseInt(process.env.SMTP_PORT ?? "587", 10);
+const smtpUser = process.env.SMTP_USER ?? "";
+const smtpPass = process.env.SMTP_PASS ?? "";
+const emailFrom = process.env.EMAIL_FROM ?? "hello@xinchao.nl";
+
+const transporter = nodemailer.createTransport({
+  host: smtpHost,
+  port: smtpPort,
+  secure: smtpPort === 465,
+  auth: {
+    user: smtpUser,
+    pass: smtpPass,
+  },
+  tls: {
+    rejectUnauthorized: true,
+  },
+});
 
 async function sendEmail(args: {
   to: string | string[];
   subject: string;
   text: string;
 }) {
-  if (!process.env.RESEND_API_KEY) {
-    console.warn("[EMAIL] No RESEND_API_KEY configured; skipping email");
+  if (!smtpUser || !smtpPass) {
+    console.warn("[EMAIL] No SMTP_USER or SMTP_PASS configured; skipping email");
     return;
   }
-  const from = process.env.EMAIL_FROM ?? "noreply@xinchao-restaurant.nl";
-  await resend.emails.send({ from, ...args });
+  try {
+    const info = await transporter.sendMail({
+      from: `"Xin Ch\u00e0o" <${emailFrom}>`,
+      to: args.to,
+      subject: args.subject,
+      text: args.text,
+    });
+    console.log("[EMAIL] Sent:", info.messageId);
+  } catch (err: any) {
+    console.error("[EMAIL] Failed to send:", err.message);
+    throw err;
+  }
 }
 
 export async function sendOrderPendingEmail(args: {
@@ -32,7 +59,7 @@ export async function sendOrderPendingEmail(args: {
 
 Your order has been received. Please complete payment using the link below.
 Order ID: ${orderId}
-Total: E$ {total.toFixed(2).replace(".", ",")}
+Total: €${total.toFixed(2).replace(".", ",")}
 Location: ${location}
 Pickup: ${pickupDate} at ${pickupTime}
 
@@ -64,7 +91,7 @@ export async function sendOrderPaidEmail(args: {
 
 Payment confirmed!
 Order ID: ${orderId}
-Total: E$ {total.toFixed(2).replace(".", ",")}
+Total: €${total.toFixed(2).replace(".", ",")}
 Location: ${location}
 Pickup: ${pickupDate} at ${pickupTime}
 

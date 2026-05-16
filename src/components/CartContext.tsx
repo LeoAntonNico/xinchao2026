@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
 
 interface CartItem {
   menuItemId: string;
@@ -11,6 +11,8 @@ interface CartItem {
   variantName?: string;
   modifierIds?: string[];
   modifierNames?: string[];
+  exclusionIds?: string[];
+  exclusionNames?: string[];
 }
 
 interface AddItemPayload {
@@ -21,6 +23,8 @@ interface AddItemPayload {
   variantName?: string;
   modifierIds?: string[];
   modifierNames?: string[];
+  exclusionIds?: string[];
+  exclusionNames?: string[];
 }
 
 interface CartContextValue {
@@ -35,16 +39,34 @@ interface CartContextValue {
   setIsOpen: (open: boolean) => void;
 }
 
+const CART_KEY = "xinchao_cart";
 const CartContext = createContext<CartContextValue | null>(null);
 
-function itemKey(it: { menuItemId: string; variantId?: string; modifierIds?: string[] }) {
+function itemKey(it: { menuItemId: string; variantId?: string; modifierIds?: string[]; exclusionIds?: string[] }) {
   const mods = (it.modifierIds || []).sort().join(",");
-  return `${it.menuItemId}:${it.variantId || ""}:${mods}`;
+  const excl = (it.exclusionIds || []).sort().join(",");
+  return `${it.menuItemId}:${it.variantId || ""}:${mods}:${excl}`;
 }
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [isOpen, setIsOpen] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+
+  /* ── hydrate from localStorage on mount ── */
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(CART_KEY);
+      if (raw) setItems(JSON.parse(raw));
+    } catch { /* ignore corrupt storage */ }
+    setHydrated(true);
+  }, []);
+
+  /* ── persist to localStorage on every change ── */
+  useEffect(() => {
+    if (!hydrated) return;
+    localStorage.setItem(CART_KEY, JSON.stringify(items));
+  }, [items, hydrated]);
 
   const addItem = useCallback((newItem: AddItemPayload) => {
     setItems((prev) => {

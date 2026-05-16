@@ -30,7 +30,7 @@ export default async function AdminPage() {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-3xl font-bold text-white">Admin Dashboard</h1>
+      <h1 className="text-3xl font-bold text-foreground">Admin Dashboard</h1>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {cards.map((card) => {
           const Icon = card.icon;
@@ -38,12 +38,12 @@ export default async function AdminPage() {
             <Link
               key={card.label}
               href={card.href}
-              className="block bg-sidebar border border-border-default rounded-xl p-5 hover:border-gray-500 transition-colors"
+              className="block bg-white border border-border-default rounded-xl p-5 hover:border-gray-500 transition-colors"
             >
               <div className="flex items-center justify-between mb-3">
                 <Icon className={`w-5 h-5 ${card.color}`} />
               </div>
-              <p className="text-2xl font-bold text-white">{card.value}</p>
+              <p className="text-2xl font-bold text-foreground">{card.value}</p>
               <p className="text-sm text-gray-400 mt-1">{card.label}</p>
             </Link>
           );

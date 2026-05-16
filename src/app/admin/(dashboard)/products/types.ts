@@ -1,8 +1,9 @@
-export interface Category { id: string; name: string; }
+export interface Category { id: string; name: string; slug: string; sortOrder: number; }
 export interface DietaryOption { id: string; slug: string; nameEn: string; nameNl: string; iconUrl: string | null; sortOrder: number; }
 export interface Location { id: string; name: string; }
 export interface Variant { id: string; name: string; nameNl: string | null; price: number; sortOrder: number; }
 export interface Modifier { id: string; name: string; nameNl: string | null; price: number; sortOrder: number; }
+export interface Exclusion { id: string; name: string; nameNl: string | null; sortOrder: number; }
 export interface MenuItem {
   id: string;
   name: string;
@@ -17,6 +18,7 @@ export interface MenuItem {
   imageUrl: string | null;
   imageUrls: string[];
   isAvailable: boolean;
+  isDineInOnly: boolean;
   sortOrder: number;
   locations: Location[];
   categories: Category[];
@@ -24,4 +26,5 @@ export interface MenuItem {
   isSpicy: boolean;
   variants: Variant[];
   modifiers: Modifier[];
+  exclusions: Exclusion[];
 }

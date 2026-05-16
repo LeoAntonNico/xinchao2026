@@ -1,0 +1,49 @@
+version: "3.8"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: restaurant-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      NEXTAUTH_URL: ${NEXTAUTH_URL}
+      MOLLIE_API_KEY: ${MOLLIE_API_KEY}
+      NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      PRINT_AGENT_SECRET: ${PRINT_AGENT_SECRET}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      EMAIL_FROM: ${EMAIL_FROM}
+    depends_on:
+      - db
+    networks:
+      - restaurant-net
+    volumes:
+      - /opt/restaurant/uploads:/app/public/uploads
+
+  db:
+    image: postgres:15-alpine
+    container_name: restaurant-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: restaurant
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: restaurant
+    volumes:
+      - /opt/postgres/data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    networks:
+      - restaurant-net
+
+networks:
+  restaurant-net:
+    driver: bridge
