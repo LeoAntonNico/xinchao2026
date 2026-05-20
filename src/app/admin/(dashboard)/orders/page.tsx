@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Package, Clock, ChefHat, CheckCircle2, Ban, RotateCcw } from "lucide-react";
+import { Eye, Package, RotateCcw, X } from "lucide-react";
 
 interface Order {
   id: string;
@@ -16,6 +16,11 @@ interface Order {
   pickupSlot: { date: string; time: string };
   items: { quantity: number; menuItem: { name: string } }[];
   molliePaymentId: string | null;
+}
+
+interface ReceiptPreview {
+  orderId: string;
+  text: string;
 }
 
 const statusConfig: Record<string, { label: string; icon: React.ReactNode; color: string; bg: string; next: string | null }> = {
@@ -46,6 +51,8 @@ export default function OrdersPage() {
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [receiptPreview, setReceiptPreview] = useState<ReceiptPreview | null>(null);
+  const [receiptLoadingId, setReceiptLoadingId] = useState<string | null>(null);
 
   const fetchOrders = useCallback(async () => {
     const res = await fetch("/api/admin/orders", { credentials: "include" });
@@ -76,6 +83,19 @@ export default function OrdersPage() {
       if (res.ok) fetchOrders();
     } finally {
       setUpdatingId(null);
+    }
+  }
+
+  async function viewReceipt(orderId: string) {
+    setReceiptLoadingId(orderId);
+    try {
+      const res = await fetch(`/api/admin/orders/${orderId}/receipt`, { credentials: "include" });
+      if (check401(res)) return;
+      if (!res.ok) return;
+      const data = await res.json();
+      setReceiptPreview({ orderId: data.orderId, text: data.text });
+    } finally {
+      setReceiptLoadingId(null);
     }
   }
 
@@ -161,6 +181,15 @@ export default function OrdersPage() {
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-1">
                       <button
+                        onClick={() => viewReceipt(order.id)}
+                        disabled={receiptLoadingId === order.id}
+                        title="View receipt"
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs border border-gray-600 text-gray-500 hover:bg-gray-200 transition-colors disabled:opacity-50"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        {receiptLoadingId === order.id ? "Loading" : "View receipt"}
+                      </button>
+                      <button
                         onClick={async () => {
                           const res = await fetch("/api/print-queue", {
                             method: "POST",
@@ -214,6 +243,38 @@ export default function OrdersPage() {
           <div className="p-8 text-center text-gray-500 text-sm">No orders found.</div>
         )}
       </div>
+
+      {receiptPreview && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="receipt-preview-title"
+        >
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-border-default overflow-hidden">
+            <div className="flex items-center justify-between border-b border-border-default px-5 py-4">
+              <div>
+                <h2 id="receipt-preview-title" className="text-lg font-bold text-foreground">
+                  Receipt preview
+                </h2>
+                <p className="text-xs text-gray-500 font-mono">{receiptPreview.orderId}</p>
+              </div>
+              <button
+                onClick={() => setReceiptPreview(null)}
+                className="p-2 rounded-full text-gray-500 hover:bg-gray-100 hover:text-foreground transition-colors"
+                aria-label="Close receipt preview"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="bg-[#f7f3ec] p-5">
+              <pre className="mx-auto max-h-[70vh] overflow-auto whitespace-pre-wrap rounded-sm bg-white px-4 py-5 font-mono text-[12px] leading-relaxed text-[#141414] shadow-sm border border-[#e8e4df]">
+                {receiptPreview.text}
+              </pre>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
