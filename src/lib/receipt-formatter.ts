@@ -119,7 +119,7 @@ export function formatReceiptEscPos(data: ReceiptData): Buffer {
   const push = (...b: Buffer[]) => parts.push(...b);
 
   // Init
-  push(reset(), font('B'), bytes(ESC, 0x4C, 0x00, 0x00)); // no left margin
+  push(reset(), font('B'), bytes(GS, 0x4C, 0x00, 0x00)); // left margin = 0
 
   // ══ HEADER ══
   push(align('C'));
