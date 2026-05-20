@@ -121,17 +121,13 @@ export function formatReceiptEscPos(data: ReceiptData): Buffer {
   // Init
   push(reset(), font('B'), bytes(GS, 0x4C, 0x00, 0x00)); // left margin = 0
 
-  // ══ HEADER ══
+  // Header
   push(align('C'));
-  push(bold(true), dhOnly(true));
-  push(txt('XIN CHAO'));
-  push(bold(false), dhOnly(false));
-  push(feed());
-
+  push(bold(true));
   push(txt(data.locationName), feed());
+  push(bold(false));
   push(txt(data.address), feed());
-  push(txt(`${data.postalCode} ${data.city}`), feed());
-  push(txt('Vietnamese Street Food'), feed(2));
+  push(txt(`${data.postalCode} ${data.city}`), feed(2));
 
   // INVOICE banner (inverse)
   push(inverse(true), bold(true));
@@ -220,11 +216,9 @@ export function formatReceiptText(data: ReceiptData): string {
   const pl = (s: string, n: number) => s.padStart(n);
 
   let out = '';
-  out += c('XIN CHAO') + '\n';
   out += c(data.locationName) + '\n';
   out += c(data.address) + '\n';
-  out += c(`${data.postalCode} ${data.city}`) + '\n';
-  out += c('Vietnamese Street Food') + '\n\n';
+  out += c(`${data.postalCode} ${data.city}`) + '\n\n';
   out += c('INVOICE') + '\n\n';
 
   out += 'Billing Address:\n';
@@ -315,7 +309,7 @@ export function buildReceiptFromOrder(
   });
 
   return {
-    locationName: `Xin Chao ${location.name}`,
+    locationName: location.name,
     address: street,
     postalCode: '6701 BT',
     city: location.name,
