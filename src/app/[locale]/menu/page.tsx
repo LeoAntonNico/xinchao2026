@@ -114,6 +114,7 @@ export default async function MenuPage({ params }: { params: Promise<{ locale: s
         "",
       price: item.price,
       image: item.imageUrls?.[0] || item.imageUrl || "/images/hero-pho.jpg",
+      isDineInOnly: item.isDineInOnly,
       dietaryTags: item.dietaryTags,
       variants: (variantsByItemId.get(item.id) ?? []).map((variant) => ({
         id: variant.id,

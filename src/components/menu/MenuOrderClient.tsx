@@ -25,6 +25,7 @@ export type MenuItemView = {
   description: string;
   price: number;
   image: string;
+  isDineInOnly: boolean;
   dietaryTags: string[];
   variants: ProductOption[];
   modifiers: ProductOption[];
@@ -62,6 +63,7 @@ function getCopy(locale: string) {
     customize: isNl ? "Aanpassen" : "Customize",
     customizeDish: isNl ? "Pas je gerecht aan" : "Customize your dish",
     decreaseQuantity: isNl ? "Aantal verlagen" : "Decrease quantity",
+    dineInOnly: isNl ? "Alleen beschikbaar voor dine-in" : "Available as Dine-In only",
     dietaryGlutenFree: isNl ? "Glutenvrij" : "Gluten-free",
     dietaryHalal: "Halal",
     emptyCart: isNl ? "Je winkelwagen is leeg" : "Your cart is empty",
@@ -124,6 +126,8 @@ export default function MenuOrderClient({ categories, dietaryOptions, locale }: 
     exclusions: ProductExclusionOption[],
     quantity: number
   ) {
+    if (item.isDineInOnly) return;
+
     const unitPrice = (variant && variant.price > 0 ? variant.price : item.price) + modifiers.reduce((sum, modifier) => sum + modifier.price, 0);
     const payload = {
       menuItemId: item.id,
@@ -145,6 +149,7 @@ export default function MenuOrderClient({ categories, dietaryOptions, locale }: 
   }
 
   function handleAdd(item: MenuItemView) {
+    if (item.isDineInOnly) return;
     setSelectedProduct(item);
   }
 
@@ -211,6 +216,7 @@ export default function MenuOrderClient({ categories, dietaryOptions, locale }: 
                   category={category}
                   index={index}
                   dietaryMap={dietaryMap}
+                  locale={locale}
                   onOpen={setSelectedProduct}
                   onAdd={handleAdd}
                 />
@@ -326,15 +332,19 @@ function MenuSection({
   category,
   index,
   dietaryMap,
+  locale,
   onOpen,
   onAdd,
 }: {
   category: MenuCategoryView;
   index: number;
   dietaryMap: Map<string, string>;
+  locale: string;
   onOpen: (item: MenuItemView) => void;
   onAdd: (item: MenuItemView) => void;
 }) {
+  const copy = getCopy(locale);
+
   return (
     <section id={slugId(category.slug)} aria-labelledby={`${slugId(category.slug)}-title`}>
       <div className="mb-6 flex items-center justify-between gap-4">
@@ -350,8 +360,14 @@ function MenuSection({
           <article key={item.id} className="group relative">
             <button
               type="button"
-              onClick={() => onOpen(item)}
-              className="block w-full text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#E30613]"
+              onClick={() => {
+                if (!item.isDineInOnly) onOpen(item);
+              }}
+              aria-disabled={item.isDineInOnly}
+              className={[
+                "block w-full text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#E30613]",
+                item.isDineInOnly ? "cursor-default" : "",
+              ].join(" ")}
             >
               <div className="relative aspect-[4/3] overflow-hidden bg-[#EFEAE3]">
                 <Image
@@ -368,6 +384,11 @@ function MenuSection({
                   <p className="mt-2 line-clamp-2 text-[14px] leading-6 text-[#6B7280]">{item.description}</p>
                 )}
                 <p className="mt-4 text-base font-extrabold">{formatPrice(item.price)}</p>
+                {item.isDineInOnly && (
+                  <span className="mt-3 inline-flex rounded-full border border-[#8B6914]/25 bg-[#FFF7E6] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#8B6914]">
+                    {copy.dineInOnly}
+                  </span>
+                )}
                 <div className="mt-2 flex flex-wrap gap-2">
                   {item.dietaryTags.map((slug) => {
                     const label = dietaryMap.get(slug);
@@ -381,14 +402,16 @@ function MenuSection({
                 </div>
               </div>
             </button>
-            <button
-              type="button"
-              onClick={() => onAdd(item)}
-              className="absolute bottom-0 right-0 flex h-9 w-9 items-center justify-center border border-[#E30613] bg-white text-[#E30613] transition hover:bg-[#E30613] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E30613]"
-              aria-label={`Add ${item.name} to cart`}
-            >
-              <Plus className="h-5 w-5" aria-hidden="true" />
-            </button>
+            {!item.isDineInOnly && (
+              <button
+                type="button"
+                onClick={() => onAdd(item)}
+                className="absolute bottom-0 right-0 flex h-9 w-9 items-center justify-center border border-[#E30613] bg-white text-[#E30613] transition hover:bg-[#E30613] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E30613]"
+                aria-label={`Add ${item.name} to cart`}
+              >
+                <Plus className="h-5 w-5" aria-hidden="true" />
+              </button>
+            )}
           </article>
         ))}
       </div>

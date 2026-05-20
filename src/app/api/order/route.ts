@@ -60,6 +60,23 @@ export async function POST(req: Request) {
     if (!locationId || !slotId) {
       return NextResponse.json({ error: "Missing location or pickup time" }, { status: 400 });
     }
+
+    const itemIds = (items as OrderItemInput[]).map((item) => item.menuItemId);
+    const dineInOnlyItems = await prisma.menuItem.findMany({
+      where: { id: { in: itemIds }, isDineInOnly: true },
+      select: { name: true },
+    });
+    if (dineInOnlyItems.length > 0) {
+      return NextResponse.json(
+        {
+          error: `${dineInOnlyItems.map((item) => item.name).join(", ")} ${
+            dineInOnlyItems.length === 1 ? "is" : "are"
+          } available as dine-in only`,
+        },
+        { status: 400 }
+      );
+    }
+
     const total = items.reduce(
       (sum: number, i: OrderItemInput) => sum + i.price * i.quantity,
       0
