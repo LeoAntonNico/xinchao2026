@@ -2,12 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { prisma } from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
+import { previewMenuCategories } from "@/lib/local-preview-data";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const categories = await prisma.menuCategory.findMany({ orderBy: { sortOrder: "asc" } });
-  return NextResponse.json(categories);
+  try {
+    const categories = await prisma.menuCategory.findMany({ orderBy: { sortOrder: "asc" } });
+    return NextResponse.json(categories);
+  } catch (error) {
+    console.warn("[admin] Using local preview categories", error);
+    return NextResponse.json(
+      previewMenuCategories.map(({ items: _items, ...category }) => category)
+    );
+  }
 }
 
 export async function POST(request: NextRequest) {

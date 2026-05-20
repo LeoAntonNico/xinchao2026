@@ -19,8 +19,12 @@ import {
   AlertCircle,
   MapPin,
   CalendarClock,
+  Mail,
+  Lock,
+  Phone,
 } from "lucide-react";
 import Image from "next/image";
+import { formatExclusionForReceipt } from "@/lib/cart-display";
 
 interface Customer {
   id: string;
@@ -84,15 +88,219 @@ function statusLabel(status: string, isNl: boolean) {
   return labels[status] || status;
 }
 
+function AccountAuthPanel({
+  locale,
+  mode,
+  setMode,
+  name,
+  setName,
+  email,
+  setEmail,
+  phone,
+  setPhone,
+  password,
+  setPassword,
+  error,
+  loading,
+  onSubmit,
+  onSocialAuth,
+}: {
+  locale: string;
+  mode: "login" | "register";
+  setMode: (mode: "login" | "register") => void;
+  name: string;
+  setName: (value: string) => void;
+  email: string;
+  setEmail: (value: string) => void;
+  phone: string;
+  setPhone: (value: string) => void;
+  password: string;
+  setPassword: (value: string) => void;
+  error: string;
+  loading: boolean;
+  onSubmit: (event: React.FormEvent) => void;
+  onSocialAuth: (provider: "Google" | "Apple") => void;
+}) {
+  const isNl = locale === "nl";
+  const isRegister = mode === "register";
+
+  return (
+    <main className="min-h-[calc(100vh-80px)] bg-[#FAF7F1] px-4 py-8 sm:py-12">
+      <div className="mx-auto flex max-w-md flex-col gap-5">
+        <Link href={`/${locale}/order`} className="inline-flex items-center gap-2 self-start text-sm font-medium text-[#737373] transition-colors hover:text-[#171717]">
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+          {isNl ? "Terug naar bestellen" : "Back to order"}
+        </Link>
+
+        <section className="overflow-hidden rounded-3xl border border-[#E5E1DA] bg-white shadow-[0_22px_70px_rgba(20,20,20,0.08)]">
+          <div className="px-6 pb-5 pt-7 text-center">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[#E31B23]/10">
+              {isRegister ? <User className="h-6 w-6 text-[#E31B23]" /> : <AlertCircle className="h-6 w-6 text-[#E31B23]" />}
+            </div>
+            <h1 className="text-2xl font-extrabold leading-tight text-[#171717]">
+              {isRegister ? (isNl ? "Maak je account aan" : "Create your account") : (isNl ? "Log in op je account" : "Sign in to your account")}
+            </h1>
+            <p className="mt-2 text-sm leading-6 text-[#737373]">
+              {isRegister
+                ? (isNl ? "Bewaar je gegevens en bekijk straks makkelijk je bestellingen." : "Save your details and quickly view your orders later.")
+                : (isNl ? "Bekijk je bestellingen en beheer je gegevens." : "View your orders and manage your details.")}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 border-y border-[#E5E1DA] bg-[#FAF7F1] p-1">
+            <button
+              type="button"
+              onClick={() => setMode("login")}
+              className={`min-h-11 rounded-2xl text-sm font-bold transition ${!isRegister ? "bg-white text-[#171717] shadow-sm" : "text-[#737373] hover:text-[#171717]"}`}
+            >
+              {isNl ? "Inloggen" : "Sign in"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("register")}
+              className={`min-h-11 rounded-2xl text-sm font-bold transition ${isRegister ? "bg-white text-[#171717] shadow-sm" : "text-[#737373] hover:text-[#171717]"}`}
+            >
+              {isNl ? "Account maken" : "Create account"}
+            </button>
+          </div>
+
+          <div className="space-y-3 px-6 pt-5">
+            <button
+              type="button"
+              onClick={() => onSocialAuth("Google")}
+              className="flex min-h-12 w-full items-center justify-center gap-3 rounded-2xl border border-[#E5E1DA] bg-white px-4 text-sm font-bold text-[#171717] transition hover:border-[#171717] focus:outline-none focus:ring-2 focus:ring-[#E31B23]/25"
+            >
+              <span className="flex h-6 w-6 items-center justify-center rounded-full border border-[#E5E1DA] text-xs font-extrabold text-[#4285F4]">G</span>
+              {isNl ? "Doorgaan met Google" : "Continue with Google"}
+            </button>
+            <button
+              type="button"
+              onClick={() => onSocialAuth("Apple")}
+              className="flex min-h-12 w-full items-center justify-center gap-3 rounded-2xl border border-[#171717] bg-[#171717] px-4 text-sm font-bold text-white transition hover:bg-black focus:outline-none focus:ring-2 focus:ring-[#E31B23]/25"
+            >
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white text-xs font-extrabold text-[#171717]">A</span>
+              {isNl ? "Doorgaan met Apple" : "Continue with Apple"}
+            </button>
+          </div>
+
+          <div className="mx-6 my-5 flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.16em] text-[#A3A3A3]">
+            <span className="h-px flex-1 bg-[#E5E1DA]" />
+            {isNl ? "of met e-mail" : "or use email"}
+            <span className="h-px flex-1 bg-[#E5E1DA]" />
+          </div>
+
+          <form onSubmit={onSubmit} className="space-y-4 px-6 pb-7">
+            {isRegister && (
+              <label className="block">
+                <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.12em] text-[#737373]">{isNl ? "Naam" : "Name"}</span>
+                <span className="relative block">
+                  <User className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#A3A3A3]" />
+                  <input
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    required={isRegister}
+                    autoComplete="name"
+                    className="min-h-12 w-full rounded-2xl border border-[#E5E1DA] bg-[#FAF7F1] py-3 pl-11 pr-4 text-sm text-[#171717] outline-none transition focus:border-[#E31B23] focus:ring-2 focus:ring-[#E31B23]/15"
+                    placeholder={isNl ? "Je naam" : "Your name"}
+                  />
+                </span>
+              </label>
+            )}
+
+            <label className="block">
+              <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.12em] text-[#737373]">Email</span>
+              <span className="relative block">
+                <Mail className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#A3A3A3]" />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  required
+                  autoComplete="email"
+                  className="min-h-12 w-full rounded-2xl border border-[#E5E1DA] bg-[#FAF7F1] py-3 pl-11 pr-4 text-sm text-[#171717] outline-none transition focus:border-[#E31B23] focus:ring-2 focus:ring-[#E31B23]/15"
+                  placeholder={isNl ? "je@email.nl" : "you@email.com"}
+                />
+              </span>
+            </label>
+
+            {isRegister && (
+              <label className="block">
+                <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.12em] text-[#737373]">{isNl ? "Telefoon" : "Phone"}</span>
+                <span className="relative block">
+                  <Phone className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#A3A3A3]" />
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={(event) => setPhone(event.target.value)}
+                    required={isRegister}
+                    autoComplete="tel"
+                    className="min-h-12 w-full rounded-2xl border border-[#E5E1DA] bg-[#FAF7F1] py-3 pl-11 pr-4 text-sm text-[#171717] outline-none transition focus:border-[#E31B23] focus:ring-2 focus:ring-[#E31B23]/15"
+                    placeholder="+31"
+                  />
+                </span>
+              </label>
+            )}
+
+            <label className="block">
+              <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.12em] text-[#737373]">{isNl ? "Wachtwoord" : "Password"}</span>
+              <span className="relative block">
+                <Lock className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#A3A3A3]" />
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  required
+                  minLength={6}
+                  autoComplete={isRegister ? "new-password" : "current-password"}
+                  className="min-h-12 w-full rounded-2xl border border-[#E5E1DA] bg-[#FAF7F1] py-3 pl-11 pr-4 text-sm text-[#171717] outline-none transition focus:border-[#E31B23] focus:ring-2 focus:ring-[#E31B23]/15"
+                  placeholder={isNl ? "Minimaal 6 tekens" : "At least 6 characters"}
+                />
+              </span>
+            </label>
+
+            {error && (
+              <p className="rounded-2xl bg-[#E31B23]/10 px-4 py-3 text-sm leading-5 text-[#E31B23]" role="alert">
+                {error}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#E31B23] px-5 py-4 text-sm font-extrabold uppercase tracking-[0.14em] text-white shadow-[0_14px_30px_rgba(227,27,35,0.18)] transition hover:bg-[#c4161d] disabled:opacity-60"
+            >
+              {loading && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+              {isRegister ? (isNl ? "Account maken" : "Create account") : (isNl ? "Inloggen" : "Sign in")}
+            </button>
+
+            <Link href={`/${locale}/checkout`} className="block text-center text-sm font-medium text-[#737373] transition hover:text-[#171717]">
+              {isNl ? "Verder als gast bij afrekenen" : "Continue as guest at checkout"}
+            </Link>
+          </form>
+        </section>
+      </div>
+    </main>
+  );
+}
+
 export default function MyAccountPage() {
   const locale = useLocale();
   const isNl = locale === "nl";
   const router = useRouter();
+  const initialToken = typeof window !== "undefined" ? localStorage.getItem("xinchao_token") : null;
 
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [token, setToken] = useState<string | null>(initialToken);
+  const [loading, setLoading] = useState(Boolean(initialToken));
   const [error, setError] = useState("");
+  const [authMode, setAuthMode] = useState<"login" | "register">("login");
+  const [authName, setAuthName] = useState("");
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPhone, setAuthPhone] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authError, setAuthError] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
 
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState("");
@@ -102,12 +310,8 @@ export default function MyAccountPage() {
   const [saveError, setSaveError] = useState("");
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  const token = typeof window !== "undefined" ? localStorage.getItem("xinchao_token") : null;
-
   useEffect(() => {
     if (!token) {
-      setLoading(false);
-      setError(isNl ? "Je bent niet ingelogd" : "You are not signed in");
       return;
     }
     const headers = { Authorization: `Bearer ${token}` };
@@ -124,9 +328,69 @@ export default function MyAccountPage() {
         setEditName(meData.name || "");
         setEditPhone(meData.phone || "");
       })
-      .catch((e) => setError(e.message))
+      .catch((e) => {
+        localStorage.removeItem("xinchao_token");
+        localStorage.removeItem("xinchao_customer");
+        setToken(null);
+        setError(e.message);
+      })
       .finally(() => setLoading(false));
   }, [token, isNl]);
+
+  const saveCustomerSession = (sessionToken: string, sessionCustomer: Customer) => {
+    localStorage.setItem("xinchao_token", sessionToken);
+    localStorage.setItem("xinchao_customer", JSON.stringify(sessionCustomer));
+    setCustomer(sessionCustomer);
+    setEditName(sessionCustomer.name || "");
+    setEditPhone(sessionCustomer.phone || "");
+    setError("");
+    setToken(sessionToken);
+    setLoading(true);
+  };
+
+  const handleAuthSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setAuthError("");
+    setAuthLoading(true);
+    try {
+      const email = authEmail.trim().toLowerCase();
+      if (authMode === "register") {
+        const registerResponse = await fetch("/api/customer/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: authName.trim(),
+            email,
+            phone: authPhone.trim(),
+            password: authPassword,
+          }),
+        });
+        const registerData = await registerResponse.json();
+        if (!registerResponse.ok) throw new Error(registerData.error || (isNl ? "Registreren is niet gelukt" : "Could not create account"));
+      }
+
+      const loginResponse = await fetch("/api/customer/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password: authPassword }),
+      });
+      const loginData = await loginResponse.json();
+      if (!loginResponse.ok) throw new Error(loginData.error || (isNl ? "Inloggen is niet gelukt" : "Could not sign in"));
+      saveCustomerSession(loginData.token, loginData.customer);
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : isNl ? "Er ging iets mis" : "Something went wrong");
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleSocialAuth = (provider: "Google" | "Apple") => {
+    setAuthError(
+      isNl
+        ? `${provider} inloggen moet nog worden gekoppeld in de betaalomgeving. Gebruik nu e-mail en wachtwoord.`
+        : `${provider} sign-in still needs to be connected. Please use email and password for now.`
+    );
+  };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -174,24 +438,47 @@ export default function MyAccountPage() {
 
   if (error) {
     return (
-      <div className="min-h-[60vh] flex items-center justify-center bg-[#FAF7F1] px-4">
-        <div className="text-center space-y-5 max-w-sm">
-          <div className="w-16 h-16 bg-[#E31B23]/10 rounded-full flex items-center justify-center mx-auto">
-            <AlertCircle className="w-7 h-7 text-[#E31B23]" />
-          </div>
-          <p className="text-[#737373] text-sm">{error}</p>
-          <button
-            onClick={() => router.push(`/${locale}/checkout`)}
-            className="inline-flex items-center gap-2 px-6 py-2.5 bg-[#E31B23] text-white text-xs font-bold tracking-widest uppercase hover:bg-[#c4161d] transition-colors rounded-xl"
-          >
-            {isNl ? "Terug naar afrekenen" : "Back to checkout"}
-          </button>
-        </div>
-      </div>
+      <AccountAuthPanel
+        locale={locale}
+        mode={authMode}
+        setMode={setAuthMode}
+        name={authName}
+        setName={setAuthName}
+        email={authEmail}
+        setEmail={setAuthEmail}
+        phone={authPhone}
+        setPhone={setAuthPhone}
+        password={authPassword}
+        setPassword={setAuthPassword}
+        error={authError || error}
+        loading={authLoading}
+        onSubmit={handleAuthSubmit}
+        onSocialAuth={handleSocialAuth}
+      />
     );
   }
 
-  if (!customer) return null;
+  if (!customer) {
+    return (
+      <AccountAuthPanel
+        locale={locale}
+        mode={authMode}
+        setMode={setAuthMode}
+        name={authName}
+        setName={setAuthName}
+        email={authEmail}
+        setEmail={setAuthEmail}
+        phone={authPhone}
+        setPhone={setAuthPhone}
+        password={authPassword}
+        setPassword={setAuthPassword}
+        error={authError}
+        loading={authLoading}
+        onSubmit={handleAuthSubmit}
+        onSocialAuth={handleSocialAuth}
+      />
+    );
+  }
 
   return (
     <div className="min-h-[calc(100vh-80px)] bg-[#FAF7F1] py-8 px-4">
@@ -377,10 +664,7 @@ export default function MyAccountPage() {
                           )}
                           {item.exclusionNames?.length > 0 && (
                             <p className="text-[11px] text-[#B99516]">
-                              {item.exclusionNames.map((e) => {
-                                const label = e.trim().toUpperCase().startsWith("NO ") ? e.trim().substring(3) : e;
-                                return `NO ${label}`;
-                              }).join(", ")}
+                              {item.exclusionNames.map(formatExclusionForReceipt).join(", ")}
                             </p>
                           )}
                         </div>

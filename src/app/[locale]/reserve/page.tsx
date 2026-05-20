@@ -1,18 +1,21 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useLocale, useTranslations } from "next-intl";
+import { useLocale } from "next-intl";
 import {
   MapPin, Calendar, Clock, Users, CheckCircle,
   AlertCircle, ArrowRight, Info, Phone, Mail, User, MessageSquare,
-  Utensils
+  Utensils, Navigation, CalendarPlus, Pencil, Heart, ShieldCheck, Send,
+  RefreshCw, Leaf
 } from "lucide-react";
+import Image from "next/image";
 
 interface Location {
   id: string;
   name: string;
   slug: string;
   address?: string;
+  phone?: string;
   openTime?: string;
   closeTime?: string;
 }
@@ -22,8 +25,71 @@ interface Availability {
   availability: Record<string, number>;
 }
 
+interface ConfirmedReservation {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+  date: string;
+  time: string;
+  partySize: number;
+  notes: string;
+  location: Location;
+}
+
+function parseTimeToMinutes(time?: string) {
+  const match = time?.match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return null;
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+
+function getLocationStatus(loc: Location, isNl: boolean) {
+  const openMinutes = parseTimeToMinutes(loc.openTime);
+  const closeMinutes = parseTimeToMinutes(loc.closeTime);
+  if (openMinutes === null || closeMinutes === null || !loc.openTime || !loc.closeTime) {
+    return {
+      isOpen: false,
+      label: isNl ? "Status onbekend" : "Status unavailable",
+      detail: "",
+    };
+  }
+
+  const now = new Date();
+  const amsterdamTime = new Date(now.toLocaleString("en-US", { timeZone: "Europe/Amsterdam" }));
+  const currentMinutes = amsterdamTime.getHours() * 60 + amsterdamTime.getMinutes();
+  const isOpen = currentMinutes >= openMinutes && currentMinutes < closeMinutes;
+
+  if (isOpen) {
+    return {
+      isOpen: true,
+      label: isNl ? "Open" : "Open",
+      detail: isNl ? `tot ${loc.closeTime}` : `until ${loc.closeTime}`,
+    };
+  }
+
+  const opensToday = currentMinutes < openMinutes;
+  return {
+    isOpen: false,
+    label: isNl ? "Gesloten" : "Closed",
+    detail: opensToday
+      ? (isNl ? `opent vandaag om ${loc.openTime}` : `opens today at ${loc.openTime}`)
+      : (isNl ? `opent morgen om ${loc.openTime}` : `opens tomorrow at ${loc.openTime}`),
+  };
+}
+
+function formatReservationDate(dateValue: string, isNl: boolean) {
+  return new Date(`${dateValue}T00:00:00`).toLocaleDateString(isNl ? "nl-NL" : "en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+}
+
+function reservationCode(id: string) {
+  return `XC-${id.slice(-4).toUpperCase()}`;
+}
+
 export default function ReservePage() {
-  const t = useTranslations();
   const locale = useLocale();
   const isNl = locale === "nl";
 
@@ -41,6 +107,7 @@ export default function ReservePage() {
   const [avail, setAvail] = useState<Availability | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
+  const [confirmedReservation, setConfirmedReservation] = useState<ConfirmedReservation | null>(null);
 
   useEffect(() => {
     fetch("/api/locations")
@@ -49,7 +116,10 @@ export default function ReservePage() {
   }, []);
 
   useEffect(() => {
-    if (!form.locationId || !form.date) { setAvail(null); return; }
+    if (!form.locationId || !form.date) {
+      queueMicrotask(() => setAvail(null));
+      return;
+    }
     fetch(`/api/reserve/availability?locationId=${form.locationId}&date=${form.date}`)
       .then((r) => r.json())
       .then((d) => setAvail(d))
@@ -109,10 +179,20 @@ export default function ReservePage() {
     setLoading(false);
 
     if (res.ok) {
-      setMessage({
-        text: isNl ? "Reservering bevestigd! Tot snel." : "Reservation confirmed! See you soon.",
-        type: "success",
-      });
+      const confirmedLocation = selectedLocation;
+      if (confirmedLocation) {
+        setConfirmedReservation({
+          id: data.id,
+          name: form.name,
+          phone: form.phone,
+          email: form.email,
+          date: form.date,
+          time: form.time,
+          partySize: form.partySize,
+          notes: form.notes,
+          location: confirmedLocation,
+        });
+      }
       setForm({ name: "", phone: "", email: "", locationId: "", date: "", time: "", partySize: 2, notes: "" });
       setAvail(null);
     } else {
@@ -123,7 +203,28 @@ export default function ReservePage() {
     }
   };
 
-  const selectedLoc = locations.find((l) => l.id === form.locationId);
+  if (confirmedReservation) {
+    return (
+      <ReservationConfirmation
+        reservation={confirmedReservation}
+        isNl={isNl}
+        locale={locale}
+        onEdit={() => {
+          setForm({
+            name: confirmedReservation.name,
+            phone: confirmedReservation.phone,
+            email: confirmedReservation.email,
+            locationId: confirmedReservation.location.id,
+            date: confirmedReservation.date,
+            time: confirmedReservation.time,
+            partySize: confirmedReservation.partySize,
+            notes: confirmedReservation.notes,
+          });
+          setConfirmedReservation(null);
+        }}
+      />
+    );
+  }
 
   return (
     <div className="px-6 md:px-10 py-8">
@@ -393,24 +494,40 @@ export default function ReservePage() {
                   {isNl ? "Onze Locaties" : "Our Locations"}
                 </h3>
               </div>
-              <div className="space-y-4">
-                {locations.map((loc) => (
-                  <div key={loc.id} className="space-y-1">
-                    <p className="font-bold text-[14px] text-foreground">{loc.name}</p>
-                    {loc.address && (
-                      <p className="text-[12px] text-gray-500 flex items-start gap-1.5">
-                        <MapPin className="w-3 h-3 mt-0.5 shrink-0" />
-                        {loc.address}
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </div>
-              <div className="border-t border-gray-100 pt-4">
-                <div className="flex items-center justify-between text-[12px] font-mono uppercase tracking-wider">
-                  <span className="text-gray-400">{isNl ? "Status" : "Status"}</span>
-                  <span className="text-logo-red font-bold">{isNl ? "OPEN" : "OPEN NOW"}</span>
-                </div>
+              <div className="space-y-3">
+                {locations.map((loc) => {
+                  const status = getLocationStatus(loc, isNl);
+                  return (
+                    <div key={loc.id} className="rounded-xl border border-gray-100 bg-[#FAF7F1] p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-bold text-[14px] leading-tight text-foreground">{loc.name}</p>
+                          {loc.address && (
+                            <p className="mt-1.5 flex items-start gap-1.5 text-[12px] leading-snug text-gray-500">
+                              <MapPin className="mt-0.5 h-3 w-3 shrink-0" />
+                              {loc.address}
+                            </p>
+                          )}
+                        </div>
+                        <span
+                          className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] ${
+                            status.isOpen
+                              ? "bg-success/10 text-success"
+                              : "bg-logo-red/10 text-logo-red"
+                          }`}
+                        >
+                          {status.label}
+                        </span>
+                      </div>
+                      {status.detail && (
+                        <div className="mt-3 flex items-center gap-1.5 border-t border-gray-200 pt-2 text-[12px] font-medium text-gray-600">
+                          <Clock className={`h-3.5 w-3.5 ${status.isOpen ? "text-success" : "text-logo-red"}`} />
+                          <span>{status.detail}</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -455,6 +572,259 @@ export default function ReservePage() {
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function ReservationConfirmation({
+  reservation,
+  isNl,
+  locale,
+  onEdit,
+}: {
+  reservation: ConfirmedReservation;
+  isNl: boolean;
+  locale: string;
+  onEdit: () => void;
+}) {
+  const dateLabel = formatReservationDate(reservation.date, isNl);
+  const bookingId = reservationCode(reservation.id);
+  const mapsUrl = `https://maps.google.com/?q=${encodeURIComponent(reservation.location.address || reservation.location.name)}`;
+  const emailShown = reservation.email || (isNl ? "je e-mailadres" : "your email");
+
+  return (
+    <div className="min-h-screen bg-[#FAF7F1] px-4 py-8 text-foreground sm:px-6 lg:px-10">
+      <div className="mx-auto max-w-5xl">
+        <header className="mb-7 text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-success/10 text-success ring-8 ring-success/5">
+            <CheckCircle className="h-8 w-8" aria-hidden="true" />
+          </div>
+          <h1 className="font-display text-[32px] uppercase leading-none tracking-tight sm:text-[46px]">
+            {isNl ? "Reservering" : "Reservation"} <span className="text-logo-red">{isNl ? "bevestigd" : "confirmed"}</span>
+          </h1>
+          <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-gray-600">
+            {isNl
+              ? `Bedankt ${reservation.name}, je tafel is gereserveerd bij ${reservation.location.name}.`
+              : `Thanks ${reservation.name}, your table is reserved at ${reservation.location.name}.`}
+          </p>
+          <p className="mt-1 text-xs text-gray-400">
+            {isNl ? "We hebben je bevestiging per e-mail verstuurd." : "We sent your confirmation by email."}
+          </p>
+        </header>
+
+        <section className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-[0_18px_60px_rgba(20,20,20,0.08)]">
+          <div className="bg-[#17120F] px-5 py-5 text-white sm:px-8">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-logo-gold">
+                  {isNl ? "Reservering" : "Reservation"}
+                </p>
+                <h2 className="mt-1 font-display text-[28px] leading-none tracking-tight">{reservation.location.name}</h2>
+              </div>
+              <div className="text-left sm:text-right">
+                <p className="text-[11px] text-white/55">Booking ID</p>
+                <p className="font-mono text-sm font-bold tracking-wider">{bookingId}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-0 divide-y divide-gray-100 px-5 py-5 sm:grid-cols-4 sm:divide-x sm:divide-y-0 sm:px-8">
+            <ConfirmDetail icon={<Calendar className="h-4 w-4" />} label={isNl ? "Datum" : "Date"} value={dateLabel} />
+            <ConfirmDetail icon={<Clock className="h-4 w-4" />} label={isNl ? "Tijd" : "Time"} value={reservation.time} />
+            <ConfirmDetail
+              icon={<Users className="h-4 w-4" />}
+              label={isNl ? "Gasten" : "Guests"}
+              value={`${reservation.partySize} ${isNl ? (reservation.partySize === 1 ? "persoon" : "personen") : (reservation.partySize === 1 ? "person" : "people")}`}
+            />
+            <ConfirmDetail
+              icon={<MapPin className="h-4 w-4" />}
+              label={isNl ? "Locatie" : "Location"}
+              value={reservation.location.address || reservation.location.name}
+            />
+          </div>
+
+          <div className="flex flex-wrap justify-center gap-2 border-t border-gray-100 bg-[#FAF7F1] px-5 py-4">
+            <StatusPill icon={<Utensils className="h-3.5 w-3.5" />} label={isNl ? "Binnen" : "Inside"} />
+            <StatusPill icon={<ShieldCheck className="h-3.5 w-3.5" />} label={isNl ? "Bevestigd" : "Confirmed"} success />
+          </div>
+        </section>
+
+        <div className="mt-5 flex flex-col gap-3 rounded-xl border border-gray-200 bg-white px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3 text-sm text-gray-600">
+            <Info className="mt-0.5 h-5 w-5 shrink-0 text-gray-400" aria-hidden="true" />
+            <p>{isNl ? "Ben je later? We houden je tafel 15 minuten vast." : "Running late? We hold your table for 15 minutes."}</p>
+          </div>
+          {reservation.location.phone && (
+            <a
+              href={`tel:${reservation.location.phone}`}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-logo-red px-4 text-sm font-bold text-logo-red transition hover:bg-logo-red hover:text-white"
+            >
+              <Phone className="h-4 w-4" />
+              {isNl ? "Bel restaurant" : "Call restaurant"}
+            </a>
+          )}
+        </div>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          <ActionButton href={mapsUrl} icon={<Navigation className="h-5 w-5" />} label={isNl ? "Route plannen" : "Plan route"} external />
+          <ActionButton
+            href={`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(`Xin Chào reservation - ${reservation.location.name}`)}&details=${encodeURIComponent(`Booking ${bookingId}`)}&location=${encodeURIComponent(reservation.location.address || reservation.location.name)}`}
+            icon={<CalendarPlus className="h-5 w-5" />}
+            label={isNl ? "In agenda" : "Add to calendar"}
+            external
+          />
+          <button
+            type="button"
+            onClick={onEdit}
+            className="inline-flex min-h-13 items-center justify-center gap-3 rounded-lg border border-gray-200 bg-white px-4 text-sm font-bold text-foreground transition hover:border-logo-red hover:text-logo-red"
+          >
+            <Pencil className="h-5 w-5" />
+            {isNl ? "Wijzigen" : "Edit"}
+          </button>
+          <ActionButton href={`/${locale}/menu`} icon={<Heart className="h-5 w-5" />} label={isNl ? "Bekijk menu" : "View menu"} />
+        </div>
+
+        <div className="mt-5 text-center">
+          <a href={`mailto:info@xinchaorestaurant.nl?subject=${encodeURIComponent(`Cancel reservation ${bookingId}`)}`} className="text-xs font-bold text-logo-red underline underline-offset-4">
+            {isNl ? "Reservering annuleren" : "Cancel reservation"}
+          </a>
+        </div>
+
+        <div className="mt-5 grid gap-4 md:grid-cols-2">
+          <InfoPanel
+            title={isNl ? "Wat gebeurt er nu?" : "What happens next?"}
+            items={[
+              isNl ? `Bevestiging verstuurd naar ${emailShown}` : `Confirmation sent to ${emailShown}`,
+              isNl ? "Wijzigen of annuleren kan tot 2 uur vooraf." : "You can edit or cancel up to 2 hours before.",
+              isNl ? "Neem contact op bij dieetwensen of vertraging." : "Contact us for dietary needs or delays.",
+            ]}
+          />
+          <div className="rounded-xl border border-gray-200 bg-white p-5">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-logo-red/10 text-logo-red">
+                <Send className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="font-display text-xl uppercase leading-none">{isNl ? "Bevestiging verstuurd" : "Confirmation sent"}</h3>
+                <p className="mt-2 text-sm leading-6 text-gray-600">
+                  {isNl
+                    ? `We hebben de details gestuurd naar ${emailShown}.`
+                    : `We sent the details to ${emailShown}.`}
+                </p>
+                <p className="mt-1 text-xs text-gray-400">
+                  {isNl ? "Niet ontvangen? Controleer je spam of verstuur opnieuw." : "Not received? Check spam or resend it."}
+                </p>
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <button className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-logo-red px-4 text-xs font-bold uppercase tracking-wide text-white hover:bg-logo-red-hover" type="button">
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    {isNl ? "Opnieuw versturen" : "Resend"}
+                  </button>
+                  <button className="text-xs font-bold text-logo-red underline underline-offset-4" type="button">
+                    {isNl ? "E-mailadres wijzigen" : "Change email"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+            <div className="grid min-h-[160px] grid-cols-[1fr_140px]">
+              <div className="p-5">
+                <h3 className="font-display text-xl uppercase leading-none">{isNl ? "Bekijk alvast het menu" : "Preview the menu"}</h3>
+                <p className="mt-2 text-sm leading-6 text-gray-600">
+                  {isNl ? "Populair bij reserveringen: Phở Bò, Bún Chả en verse spring rolls." : "Popular for reservations: Phở Bò, Bún Chả and fresh spring rolls."}
+                </p>
+                <a href={`/${locale}/menu`} className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-logo-red">
+                  {isNl ? "Bekijk menu" : "View menu"} <ArrowRight className="h-4 w-4" />
+                </a>
+              </div>
+              <div className="relative hidden sm:block">
+                <Image src="/images/hero-pho.jpg" alt="" fill className="object-cover" sizes="140px" />
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-gray-200 bg-white p-5">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-logo-gold/10 text-logo-gold">
+                <Leaf className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="font-display text-xl uppercase leading-none">{isNl ? "Allergieën of voorkeuren?" : "Allergies or preferences?"}</h3>
+                <p className="mt-2 text-sm leading-6 text-gray-600">
+                  {isNl ? "Geef dieetwensen, kinderstoel of tafelvoorkeur door." : "Share dietary needs, a high chair or table preference."}
+                </p>
+                <button type="button" onClick={onEdit} className="mt-4 rounded-lg border border-logo-red px-4 py-2 text-xs font-bold uppercase tracking-wide text-logo-red hover:bg-logo-red hover:text-white">
+                  {isNl ? "Voorkeuren doorgeven" : "Share preferences"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <footer className="mt-8 flex flex-col gap-4 border-t border-gray-200 py-5 text-xs text-gray-600 sm:flex-row sm:items-center sm:justify-between">
+          <a href={`tel:${reservation.location.phone || "+31307857092"}`} className="inline-flex items-center gap-2">
+            <Phone className="h-4 w-4 text-logo-red" />
+            {isNl ? "Hulp nodig?" : "Need help?"} {reservation.location.phone || "+31 30 785 7092"}
+          </a>
+          <span className="inline-flex items-center gap-2">
+            <MapPin className="h-4 w-4 text-logo-red" />
+            {reservation.location.name} · {reservation.location.address}
+          </span>
+          <span className="text-gray-400">Privacy · {isNl ? "Voorwaarden" : "Terms"}</span>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+function ConfirmDetail({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="py-4 sm:px-5 sm:py-2">
+      <div className="mb-2 flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-logo-gold">
+        {icon}
+        {label}
+      </div>
+      <p className="text-sm font-bold leading-5 text-foreground">{value}</p>
+    </div>
+  );
+}
+
+function StatusPill({ icon, label, success = false }: { icon: React.ReactNode; label: string; success?: boolean }) {
+  return (
+    <span className={`inline-flex min-h-9 items-center gap-2 rounded-md px-5 text-xs font-bold ${success ? "bg-success/10 text-success" : "bg-white text-gray-700"}`}>
+      {icon}
+      {label}
+    </span>
+  );
+}
+
+function ActionButton({ href, icon, label, external = false }: { href: string; icon: React.ReactNode; label: string; external?: boolean }) {
+  return (
+    <a
+      href={href}
+      target={external ? "_blank" : undefined}
+      rel={external ? "noopener noreferrer" : undefined}
+      className="inline-flex min-h-13 items-center justify-center gap-3 rounded-lg border border-gray-200 bg-white px-4 text-sm font-bold text-foreground transition hover:border-logo-red hover:text-logo-red"
+    >
+      {icon}
+      {label}
+    </a>
+  );
+}
+
+function InfoPanel({ title, items }: { title: string; items: string[] }) {
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-5">
+      <h3 className="font-display text-xl uppercase leading-none">{title}</h3>
+      <div className="mt-4 space-y-3">
+        {items.map((item) => (
+          <div key={item} className="flex gap-2 text-sm leading-5 text-gray-600">
+            <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-success" />
+            <span>{item}</span>
+          </div>
+        ))}
       </div>
     </div>
   );

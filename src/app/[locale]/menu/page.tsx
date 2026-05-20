@@ -1,186 +1,141 @@
-import { prisma } from "@/lib/prisma";
-import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Prisma } from "@prisma/client";
-import Image from "next/image";
+import { getTranslations, setRequestLocale } from "next-intl/server";
+import { prisma } from "@/lib/prisma";
+import { previewDietaryOptions, previewMenuCategories } from "@/lib/local-preview-data";
+import MenuOrderClient, { type MenuCategoryView, type MenuDietaryOptionView, type MenuItemView } from "@/components/menu/MenuOrderClient";
 
 type CategoryWithItems = Prisma.MenuCategoryGetPayload<{
   include: {
-    items: { where: { isAvailable: true }; orderBy: { sortOrder: "asc" } };
+    items: {
+      where: { isAvailable: true };
+      orderBy: { sortOrder: "asc" };
+    };
   };
 }>;
 
-/* Brutalist category display: e.g. PHỞ + SOUL */
-const SOUL_WORDS = ["SOUL", "FRESH", "BOWL", "CRISP", "SIP", "HEAT", "ZEN", "WILD"];
+type ProductVariant = Prisma.ProductVariantGetPayload<Record<string, never>>;
+type ProductModifier = Prisma.ProductModifierGetPayload<Record<string, never>>;
+type ProductExclusion = Prisma.ProductExclusionGetPayload<Record<string, never>>;
 
-function soulWord(idx: number) {
-  return SOUL_WORDS[idx % SOUL_WORDS.length];
+function groupByMenuItemId<T extends { menuItemId: string }>(records: T[]) {
+  return records.reduce((map, record) => {
+    const current = map.get(record.menuItemId) ?? [];
+    current.push(record);
+    map.set(record.menuItemId, current);
+    return map;
+  }, new Map<string, T[]>());
 }
 
-function formatPrice(cents: number) {
-  return `€${(cents / 100).toFixed(2).replace(".", ",")}`;
+function normalizeDishKey(value: string) {
+  return value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[‘’']/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 }
 
-function tagStyle(slug: string, crossColor: string) {
-  // crossColor is the *other* section's color (pink for lime sections, lime for pink)
-  switch (slug) {
-    case "vegan":
-      return crossColor === "lime" ? "bg-lime text-black border-lime" : "bg-neon-pink text-black border-neon-pink";
-    case "gluten-free":
-      return "bg-transparent text-white border-white/40";
-    case "spicy":
-      return "bg-transparent text-white border-white/40";
-    default:
-      return "bg-transparent text-white border-white/40";
+function productOptionScore(item: MenuItemView) {
+  return item.variants.length * 4 + item.modifiers.length * 3 + item.exclusions.length * 2 + item.description.length / 1000;
+}
+
+function dedupeMenuItems(items: MenuItemView[]) {
+  const uniqueItems = new Map<string, MenuItemView>();
+
+  for (const item of items) {
+    const key = `${normalizeDishKey(item.name)}:${item.price}:${item.image}`;
+    const existing = uniqueItems.get(key);
+    if (!existing || productOptionScore(item) > productOptionScore(existing)) {
+      uniqueItems.set(key, item);
+    }
   }
+
+  return Array.from(uniqueItems.values());
 }
 
 export default async function MenuPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   setRequestLocale(locale);
-  const t = await getTranslations();
+  await getTranslations();
   const isNl = locale === "nl";
 
-  const categories = await prisma.menuCategory.findMany({
-    include: {
-      items: { where: { isAvailable: true }, orderBy: { sortOrder: "asc" } },
-    },
-    orderBy: { sortOrder: "asc" },
-  }) as CategoryWithItems[];
+  const categories = (await prisma.menuCategory
+    .findMany({
+      include: {
+        items: { where: { isAvailable: true }, orderBy: { sortOrder: "asc" } },
+      },
+      orderBy: { sortOrder: "asc" },
+    })
+    .catch(() => previewMenuCategories)) as CategoryWithItems[];
 
-  const dietaryOpts = await prisma.dietaryOption.findMany({ orderBy: { sortOrder: "asc" } });
-  const dietaryMap = new Map(dietaryOpts.map((d) => [d.slug, d]));
+  const dietaryOptions = await prisma.dietaryOption
+    .findMany({ orderBy: { sortOrder: "asc" } })
+    .catch(() => previewDietaryOptions);
 
-  return (
-    <div className="space-y-16 pb-20">
-      {/* Page header */}
-      <header className="px-6 md:px-10 pt-6">
-        <h1 className="font-display text-[48px] md:text-[64px] leading-none tracking-tight text-on-surface-variant">
-          SÀIGÒN STREET FOOD
-        </h1>
-      </header>
+  const itemIds = categories.flatMap((category) => category.items.map((item) => item.id));
+  const [variants, modifiers, exclusions]: [ProductVariant[], ProductModifier[], ProductExclusion[]] = itemIds.length > 0
+    ? await Promise.all([
+        prisma.productVariant
+          .findMany({
+            where: { menuItemId: { in: itemIds } },
+            orderBy: [{ menuItemId: "asc" }, { sortOrder: "asc" }],
+          })
+          .catch(() => [] as ProductVariant[]),
+        prisma.productModifier
+          .findMany({
+            where: { menuItemId: { in: itemIds } },
+            orderBy: [{ menuItemId: "asc" }, { sortOrder: "asc" }],
+          })
+          .catch(() => [] as ProductModifier[]),
+        prisma.productExclusion
+          .findMany({
+            where: { menuItemId: { in: itemIds } },
+            orderBy: [{ menuItemId: "asc" }, { sortOrder: "asc" }],
+          })
+          .catch(() => [] as ProductExclusion[]),
+      ])
+    : [[], [], []];
 
-      {categories.map((cat, catIdx) => {
-        /* Alternate styling every section */
-        const isEven = catIdx % 2 === 0;
-        const accentBar = isEven ? "bg-neon-pink" : "bg-lime";
-        const crossBadge = isEven ? "bg-lime" : "bg-neon-pink";   // price badge uses cross-color
-        const useWide = isEven;                                    // even = 2-col wide cards
-        const cols = useWide ? "md:grid-cols-2" : "md:grid-cols-3";
-        const categoryName = cat.name;
+  const variantsByItemId = groupByMenuItemId(variants);
+  const modifiersByItemId = groupByMenuItemId(modifiers);
+  const exclusionsByItemId = groupByMenuItemId(exclusions);
 
-        return (
-          <section key={cat.id} className="px-6 md:px-10">
-            {/* Section title */}
-            <div className="mb-8">
-              <h2 className="text-[32px] md:text-[40px] font-display font-normal italic uppercase leading-none tracking-tight">
-                <span className="text-white">{categoryName}</span>
-                <span className="text-soul-red"> {soulWord(catIdx)}</span>
-              </h2>
-              <div className={`mt-3 h-[6px] w-24 ${accentBar}`} />
-            </div>
+  const categoryViews: MenuCategoryView[] = categories.map((category) => ({
+    id: category.id,
+    name: category.name,
+    slug: category.slug,
+    items: dedupeMenuItems(category.items.map((item) => ({
+      id: item.id,
+      name: isNl && item.nameNl ? item.nameNl : item.name,
+      description:
+        (isNl && item.shortDescriptionNl ? item.shortDescriptionNl : item.shortDescription) ||
+        (isNl && item.descriptionNl ? item.descriptionNl : item.description) ||
+        "",
+      price: item.price,
+      image: item.imageUrls?.[0] || item.imageUrl || "/images/hero-pho.jpg",
+      dietaryTags: item.dietaryTags,
+      variants: (variantsByItemId.get(item.id) ?? []).map((variant) => ({
+        id: variant.id,
+        name: isNl && variant.nameNl ? variant.nameNl : variant.name,
+        price: variant.price,
+      })),
+      modifiers: (modifiersByItemId.get(item.id) ?? []).map((modifier) => ({
+        id: modifier.id,
+        name: isNl && modifier.nameNl ? modifier.nameNl : modifier.name,
+        price: modifier.price,
+      })),
+      exclusions: (exclusionsByItemId.get(item.id) ?? []).map((exclusion) => ({
+        id: exclusion.id,
+        name: isNl && exclusion.nameNl ? exclusion.nameNl : exclusion.name,
+      })),
+    }))),
+  }));
 
-            {/* Cards grid */}
-            <div className={`grid grid-cols-1 ${cols} gap-4 md:gap-6`}>
-              {cat.items.map((item) => {
-                const name = (isNl && item.nameNl) ? item.nameNl : item.name;
-                const desc = (isNl && item.shortDescriptionNl) ? item.shortDescriptionNl : item.shortDescription;
-                const img = item.imageUrls?.[0] || item.imageUrl || "/images/hero-pho.jpg";
-                const price = formatPrice(item.price);
+  const dietaryOptionViews: MenuDietaryOptionView[] = dietaryOptions.map((option) => ({
+    slug: option.slug,
+    label: isNl && option.nameNl ? option.nameNl : option.nameEn,
+  }));
 
-                return useWide ? (
-                  /* Wide card (image left + content right) */
-                  <div
-                    key={item.id}
-                    className="flex flex-col md:flex-row bg-surface-container border border-white/5 overflow-hidden"
-                  >
-                    <div className="relative w-full md:w-1/2 aspect-[4/3] md:aspect-auto">
-                      <Image
-                        src={img}
-                        alt={name}
-                        fill
-                        className="object-cover grayscale"
-                        sizes="(max-width: 768px) 100vw, 50vw"
-                      />
-                    </div>
-                    <div className="flex-1 p-5 md:p-6 flex flex-col justify-center">
-                      <div className="flex items-start justify-between gap-3">
-                        <h3 className="text-[18px] font-bold italic uppercase text-white leading-tight">
-                          {name}
-                        </h3>
-                        <span className={`inline-block shrink-0 ${crossBadge} text-black text-[11px] font-bold font-mono tracking-wide px-2 py-1`}>
-                          {price}
-                        </span>
-                      </div>
-                      {desc && (
-                        <p className="mt-3 text-[14px] text-on-surface-variant leading-relaxed">{desc}</p>
-                      )}
-                      {item.dietaryTags.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mt-4">
-                          {item.dietaryTags.map((slug) => {
-                            const opt = dietaryMap.get(slug);
-                            if (!opt) return null;
-                            return (
-                              <span
-                                key={slug}
-                                className={`inline-block text-[10px] tracking-[0.08em] uppercase font-bold font-mono px-2 py-1 border ${tagStyle(slug, crossBadge)}`}
-                              >
-                                {isNl && opt.nameNl ? opt.nameNl : opt.nameEn}
-                              </span>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  /* Standard card (image top + content below) */
-                  <div
-                    key={item.id}
-                    className="bg-surface-container border border-white/5 overflow-hidden"
-                  >
-                    <div className="relative w-full aspect-[16/10]">
-                      <Image
-                        src={img}
-                        alt={name}
-                        fill
-                        className="object-cover grayscale"
-                        sizes="(max-width: 768px) 100vw, 33vw"
-                      />
-                      <span className={`absolute top-3 right-3 ${crossBadge} text-black text-[11px] font-bold font-mono tracking-wide px-2 py-1`}>
-                        {price}
-                      </span>
-                    </div>
-                    <div className="p-4">
-                      <h3 className="text-[16px] font-bold italic uppercase text-white leading-tight">
-                        {name}
-                      </h3>
-                      {desc && (
-                        <p className="mt-2 text-[13px] text-on-surface-variant leading-relaxed">{desc}</p>
-                      )}
-                      {item.dietaryTags.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mt-3">
-                          {item.dietaryTags.map((slug) => {
-                            const opt = dietaryMap.get(slug);
-                            if (!opt) return null;
-                            return (
-                              <span
-                                key={slug}
-                                className={`inline-block text-[10px] tracking-[0.08em] uppercase font-bold font-mono px-2 py-1 border ${tagStyle(slug, crossBadge)}`}
-                              >
-                                {isNl && opt.nameNl ? opt.nameNl : opt.nameEn}
-                              </span>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        );
-      })}
-    </div>
-  );
+  return <MenuOrderClient categories={categoryViews} dietaryOptions={dietaryOptionViews} locale={locale} />;
 }

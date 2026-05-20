@@ -16,6 +16,7 @@ import {
   Lock,
 } from "lucide-react";
 import Image from "next/image";
+import { formatExclusionForReceipt } from "@/lib/cart-display";
 
 interface OrderData {
   id: string;
@@ -230,10 +231,7 @@ export default function OrderConfirmationPage() {
                         )}
                         {item.exclusionNames && item.exclusionNames.length > 0 && (
                           <p className="text-[11px] text-[#B99516] uppercase tracking-wide">
-                            {item.exclusionNames.map(e => {
-                              const label = e.trim().toUpperCase().startsWith("NO ") ? e.trim().substring(3) : e;
-                              return `NO ${label}`;
-                            }).join(", ")}
+                            {item.exclusionNames.map(formatExclusionForReceipt).join(", ")}
                           </p>
                         )}
                       </div>

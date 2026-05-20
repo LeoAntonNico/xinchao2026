@@ -111,16 +111,11 @@ export default function LocationCard({
           </span>
         </div>
 
-        <div className="absolute top-2 right-2">
-          <span className={`inline-flex items-center px-2 py-0.5 rounded-full bg-white/90 backdrop-blur-sm text-[10px] font-bold font-mono uppercase tracking-wider ${accent.text}`}>
-            {district}
-          </span>
-        </div>
       </div>
 
       {/* Content — compact padding */}
       <div className="p-3 sm:p-4">
-        <h3 className="text-lg font-bold text-foreground capitalize mb-0.5">{slug}</h3>
+        <h3 className="text-lg font-bold text-foreground mb-0.5">{name.replace(/^Xin Chao\s+/i, "")}</h3>
         <p className="text-[12px] text-on-surface-variant mb-2 leading-snug">{description}</p>
 
         <div className="flex items-start gap-1.5 mb-3">

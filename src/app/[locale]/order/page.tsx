@@ -1,1097 +1,687 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useLocale, useTranslations } from "next-intl";
-import { useCart } from "@/components/CartContext";
-import Link from "next/link";
-import Image from "next/image";
+import { useEffect, useMemo, useState } from "react";
 import {
-  MapPin, Clock, ArrowLeft, Plus, Minus, ShoppingCart,
-  Check, X, ChevronRight, Utensils, SlidersHorizontal, Flame,
-  Calendar, Zap, Moon, ChevronDown
+  ArrowRight,
+  Calendar,
+  Check,
+  ChevronRight,
+  Clock3,
+  HeartHandshake,
+  Leaf,
+  LocateFixed,
+  LockKeyhole,
+  MapPin,
+  Soup,
+  Utensils,
 } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
+import { useLocale } from "next-intl";
+import { useRouter } from "next/navigation";
 
-import TimeSlotPicker from "./TimeSlotPicker";
-import OrderSummary from "./OrderSummary";
+type Step = {
+  id: number;
+  label: string;
+  status: "complete" | "active" | "inactive";
+};
 
-interface Location {
-  id: string;
-  name: string;
-  address: string;
-  openTime: string;
-  closeTime: string;
-}
-
-interface PickupSlot {
-  id: string;
-  date: string;
+type TimeSlot = {
   time: string;
-}
+  recommended?: boolean;
+  disabled?: boolean;
+};
 
-interface Variant { id: string; name: string; nameNl?: string; price: number; }
-interface Modifier { id: string; name: string; nameNl?: string; price: number; }
-interface Exclusion { id: string; name: string; nameNl?: string; }
+type ReassuranceItem = {
+  label: string;
+  icon: typeof Leaf;
+};
 
-interface MenuItem {
-  id: string;
-  name: string;
-  nameNl?: string | null;
-  description: string | null;
-  shortDescription: string | null;
-  shortDescriptionNl?: string | null;
-  price: number;
-  salePrice: number | null;
-  imageUrl: string | null;
-  dietaryTags: string[];
-  isSpicy: boolean;
-  isPopular?: boolean;
-  isAvailable: boolean;
-  isDineInOnly: boolean;
-  variants: Variant[];
-  modifiers: Modifier[];
-  exclusions: Exclusion[];
-}
+type PickupDay = {
+  date: string;
+  summaryLabel: string;
+  helper: string;
+};
 
-interface MenuCategory {
+type PickupLocation = {
   id: string;
   name: string;
   slug: string;
-  items: MenuItem[];
-}
+  address: string;
+  openUntil: string;
+  imageSrc: string;
+};
 
-/* ═══════════════════════════════════════════
-   HELPERS
-   ═══════════════════════════════════════════ */
+type OrderCopy = ReturnType<typeof getOrderCopy>;
 
-function fmtPrice(cents: number) {
-  return `€${(cents / 100).toFixed(2).replace(".", ",")}`;
-}
+const steps: Step[] = [
+  { id: 1, label: "Location", status: "complete" },
+  { id: 2, label: "Time", status: "active" },
+  { id: 3, label: "Your order", status: "inactive" },
+  { id: 4, label: "Checkout", status: "inactive" },
+];
 
-function fmtDate(dateStr: string, locale: string) {
-  if (!dateStr) return "";
-  const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString(locale === "nl" ? "nl-NL" : "en-US", {
-    weekday: "short", day: "numeric", month: "short",
-  });
-}
+const timeSlots: TimeSlot[] = [
+  { time: "17:30" },
+  { time: "17:45" },
+  { time: "18:00" },
+  { time: "18:15", recommended: true },
+  { time: "18:30" },
+  { time: "18:45" },
+  { time: "19:00" },
+];
 
-/* ═══════════════════════════════════════════
-   COMPONENT
-   ═══════════════════════════════════════════ */
+const pickupLocations: PickupLocation[] = [
+  {
+    id: "utrecht",
+    slug: "utrecht",
+    name: "Xin Chào Utrecht",
+    address: "Voor Clarenburg 6, 3511 JE Utrecht",
+    openUntil: "21:30",
+    imageSrc: "/images/utrecht-exterior.jpg",
+  },
+  {
+    id: "wageningen",
+    slug: "wageningen",
+    name: "Xin Chào Wageningen",
+    address: "Hoogstraat 18, 6701 BT Wageningen",
+    openUntil: "20:00",
+    imageSrc: "/images/wageningen-exterior.jpg",
+  },
+];
 
-export default function OrderPage() {
-  const t = useTranslations();
-  const locale = useLocale();
+function getOrderCopy(locale: string) {
   const isNl = locale === "nl";
+  return {
+    steps: isNl ? ["Locatie", "Tijd", "Je bestelling", "Afrekenen"] : ["Location", "Time", "Your order", "Checkout"],
+    reassuranceItems: [
+      { label: isNl ? "Elke dag verse ingredienten" : "Fresh ingredients every day", icon: Leaf },
+      { label: isNl ? "Op bestelling voor jou gemaakt" : "Made to order just for you", icon: Utensils },
+      { label: isNl ? "Dank je wel voor je lokale steun" : "Thank you for supporting local", icon: HeartHandshake },
+      { label: isNl ? "Veilig afrekenen, je gegevens zijn beschermd" : "Secure checkout, your data is protected", icon: LockKeyhole },
+    ],
+    changeLocation: isNl ? "Locatie wijzigen" : "Change location",
+    availablePickupTimes: isNl ? "Beschikbare afhaaltijden" : "Available pickup times",
+    chooseAnotherDay: isNl ? "Kies een andere dag" : "Choose another day",
+    choosePickupTime: isNl ? "Kies je afhaaltijd" : "Choose your pickup time",
+    checkoutProgress: isNl ? "Voortgang bestelling" : "Checkout progress",
+    continueToMenu: isNl ? "Verder naar menu" : "Continue to menu",
+    dayPickerTitle: isNl ? "Andere dag ophalen?" : "Need to pick up another day?",
+    heroLine1: isNl ? "Wanneer wil je" : "When do you want",
+    heroLine2: isNl ? "je bestelling ophalen?" : "to pick up your order?",
+    heroSubtitle: isNl ? "We bereiden het vers en zetten het voor je klaar." : "We'll have it freshly prepared and ready for you.",
+    kitchenBusy: isNl ? "Keuken druk: +10 min" : "Kitchen busy: +10 min",
+    open: isNl ? "Open" : "Open",
+    openTodayUntil: isNl ? "Vandaag open tot" : "Open today until",
+    openUntil: isNl ? "Open tot" : "Open until",
+    orderBefore: isNl ? "Bestel voor 20:45 om op te halen" : "Order before 20:45 for pickup",
+    pickupDay: isNl ? "Afhaaldag" : "Pickup day",
+    pickupDate: isNl ? "Selecteer afhaaldatum" : "Select pickup date",
+    recommended: isNl ? "Aanbevolen" : "Recommended",
+    showLaterTimes: isNl ? "Toon latere afhaaltijden" : "Show later pickup times",
+    today: isNl ? "vandaag" : "today",
+    viewHours: isNl ? "Bekijk onze openingstijden en plan vooruit." : "View our opening hours and plan ahead.",
+    weShowSlots: isNl ? "We tonen afhaalmomenten voor de gekozen dag." : "We show pickup slots for the selected day.",
+  };
+}
 
-  const {
-    addItem, decreaseItem, items: cartItems, total: cartTotal, setIsOpen,
-  } = useCart();
+function getDateInputValue(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
 
-  /* ── data ── */
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [selectedLocation, setSelectedLocation] = useState<string>("");
-  const [slots, setSlots] = useState<PickupSlot[]>([]);
-  const [selectedSlot, setSelectedSlot] = useState<string>("");
-  const [categories, setCategories] = useState<MenuCategory[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [step, setStep] = useState<"location" | "menu">("location");
+function addDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setDate(date.getDate() + days);
+  return next;
+}
 
-  /* ── menu state ── */
-  const [activeCat, setActiveCat] = useState<string | null>(null);
-  const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
-  const [selectedVariant, setSelectedVariant] = useState<string>("");
-  const [selectedModifiers, setSelectedModifiers] = useState<string[]>([]);
-  const [selectedExclusions, setSelectedExclusions] = useState<string[]>([]);
-  const [dietaryFilter, setDietaryFilter] = useState<string[]>([]);
-  const [cartOpen, setCartOpen] = useState(false);
+const todayDate = new Date();
+const todayInputValue = getDateInputValue(todayDate);
+const tomorrowInputValue = getDateInputValue(addDays(todayDate, 1));
 
-  /* ── fetch data ── */
+type ApiLocation = {
+  id: string;
+  name: string;
+  slug: string;
+  address: string;
+  openTime: string;
+  closeTime: string;
+};
+
+type ApiSlot = {
+  id: string;
+  date: string;
+  time: string;
+};
+
+function locationImage(slug: string) {
+  return slug === "wageningen" ? "/images/wageningen-exterior.jpg" : "/images/utrecht-exterior.jpg";
+}
+
+function getPickupDay(dateValue: string, locale: string): PickupDay {
+  const date = new Date(`${dateValue}T00:00:00`);
+  const dateLocale = locale === "nl" ? "nl-NL" : "en-GB";
+  const longLabel = date.toLocaleDateString(dateLocale, {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+  const shortLabel = date.toLocaleDateString(dateLocale, {
+    weekday: "long",
+    day: "numeric",
+    month: "short",
+  });
+
+  if (dateValue === todayInputValue) {
+    return { date: dateValue, summaryLabel: locale === "nl" ? "Vandaag" : "Today", helper: longLabel };
+  }
+
+  if (dateValue === tomorrowInputValue) {
+    return { date: dateValue, summaryLabel: locale === "nl" ? "Morgen" : "Tomorrow", helper: longLabel };
+  }
+
+  return { date: dateValue, summaryLabel: shortLabel, helper: longLabel };
+}
+
+export default function OrderPickupPage() {
+  const locale = useLocale();
+  const router = useRouter();
+  const copy = getOrderCopy(locale);
+  const localizedSteps = useMemo(
+    () => steps.map((step, index) => ({ ...step, label: copy.steps[index] })),
+    [copy.steps]
+  );
+  const [selectedTime, setSelectedTime] = useState("18:15");
+  const [selectedDate, setSelectedDate] = useState(todayInputValue);
+  const [selectedLocationId, setSelectedLocationId] = useState("utrecht");
+  const [locations, setLocations] = useState<PickupLocation[]>(pickupLocations);
+  const [savingSelection, setSavingSelection] = useState(false);
+  const [locationPickerOpen, setLocationPickerOpen] = useState(false);
+  const [dayPickerOpen, setDayPickerOpen] = useState(false);
+  const menuHref = useMemo(() => `/${locale}/menu`, [locale]);
+  const selectedLocation = useMemo(
+    () => locations.find((location) => location.id === selectedLocationId) ?? locations[0] ?? pickupLocations[0],
+    [locations, selectedLocationId]
+  );
+  const selectedDay = useMemo(() => getPickupDay(selectedDate, locale), [selectedDate, locale]);
+
   useEffect(() => {
     fetch("/api/locations")
-      .then((r) => r.json())
-      .then((data) => {
-        setLocations(data);
-        setLoading(false);
-        const savedLoc = sessionStorage.getItem("order_locationId");
-        if (savedLoc && data.some((l: Location) => l.id === savedLoc)) {
-          setSelectedLocation(savedLoc);
-          const savedSlot = sessionStorage.getItem("order_slotId");
-          if (savedSlot) setSelectedSlot(savedSlot);
-        }
-      });
+      .then((response) => response.ok ? response.json() : [])
+      .then((apiLocations: ApiLocation[]) => {
+        if (apiLocations.length === 0) return;
+        const nextLocations = apiLocations.map((location) => ({
+          id: location.id,
+          name: location.name,
+          slug: location.slug,
+          address: location.address,
+          openUntil: location.closeTime,
+          imageSrc: locationImage(location.slug),
+        }));
+        setLocations(nextLocations);
+        setSelectedLocationId((current) => {
+          const currentLocation = nextLocations.find((location) => location.id === current || location.slug === current);
+          return currentLocation?.id ?? nextLocations[0].id;
+        });
+      })
+      .catch(() => {});
   }, []);
 
-  useEffect(() => {
+  async function saveSelectionAndContinue() {
     if (!selectedLocation) return;
-    fetch(`/api/slots?locationId=${selectedLocation}&days=7`)
-      .then((r) => r.json())
-      .then(setSlots);
-    fetch(`/api/menu?locationId=${selectedLocation}&locale=${locale}`)
-      .then((r) => r.json())
-      .then(setCategories);
-  }, [selectedLocation, locale]);
+    setSavingSelection(true);
+    try {
+      const slots = await fetch(`/api/slots?locationId=${encodeURIComponent(selectedLocation.id)}&days=14`)
+        .then((response) => response.ok ? response.json() : [])
+        .catch(() => [] as ApiSlot[]);
+      const slot = (slots as ApiSlot[]).find((candidate) => candidate.date === selectedDate && candidate.time === selectedTime);
 
-  useEffect(() => {
-    if (selectedLocation) sessionStorage.setItem("order_locationId", selectedLocation);
-  }, [selectedLocation]);
+      sessionStorage.setItem("order_locationId", selectedLocation.id);
+      sessionStorage.setItem("order_locationSlug", selectedLocation.slug);
+      sessionStorage.setItem("order_locationName", selectedLocation.name);
+      sessionStorage.setItem("order_pickupDate", selectedDate);
+      sessionStorage.setItem("order_pickupTime", selectedTime);
+      if (slot?.id) {
+        sessionStorage.setItem("order_slotId", slot.id);
+      } else {
+        sessionStorage.removeItem("order_slotId");
+      }
 
-  useEffect(() => {
-    if (selectedSlot) {
-      sessionStorage.setItem("order_slotId", selectedSlot);
-      setStep("menu");
-    }
-  }, [selectedSlot]);
-
-  useEffect(() => {
-    if (selectedLocation && selectedSlot) setStep("menu");
-  }, [selectedLocation, selectedSlot]);
-
-  /* ── price helpers ── */
-  function getItemPrice(item: MenuItem) {
-    const base = item.salePrice && item.salePrice < item.price ? item.salePrice : item.price;
-    if (!selectedVariant) return base;
-    const v = item.variants.find((x) => x.id === selectedVariant);
-    return v && v.price > 0 ? v.price : base;
-  }
-
-  function getModifierTotal(item: MenuItem) {
-    return item.modifiers
-      .filter((m) => selectedModifiers.includes(m.id))
-      .reduce((s, m) => s + m.price, 0);
-  }
-
-  function handleAdd(item: MenuItem) {
-    const unit = getItemPrice(item) + getModifierTotal(item);
-    const modNames = item.modifiers
-      .filter((m) => selectedModifiers.includes(m.id))
-      .map((m) => isNl && m.nameNl ? m.nameNl : m.name);
-    const exclNames = item.exclusions
-      .filter((e) => selectedExclusions.includes(e.id))
-      .map((e) => isNl && e.nameNl ? e.nameNl : e.name);
-    const vName = selectedVariant
-      ? item.variants.find((v) => v.id === selectedVariant)?.name
-      : undefined;
-    addItem({
-      menuItemId: item.id,
-      name: isNl && item.nameNl ? item.nameNl : item.name,
-      price: unit,
-      variantId: selectedVariant || undefined,
-      variantName: vName,
-      modifierIds: selectedModifiers,
-      modifierNames: modNames,
-      exclusionIds: selectedExclusions,
-      exclusionNames: exclNames,
-    });
-    setSelectedItem(null);
-    setSelectedVariant("");
-    setSelectedModifiers([]);
-    setSelectedExclusions([]);
-  }
-
-  function handleQuickAdd(item: MenuItem) {
-    if (item.variants.length > 0 || item.modifiers.length > 0 || item.exclusions.length > 0) {
-      setSelectedItem(item);
-      setSelectedVariant(item.variants[0]?.id || "");
-      setSelectedModifiers([]);
-      setSelectedExclusions([]);
-    } else {
-      addItem({
-        menuItemId: item.id,
-        name: isNl && item.nameNl ? item.nameNl : item.name,
-        price: item.salePrice && item.salePrice < item.price ? item.salePrice : item.price,
-      });
+      router.push(menuHref);
+    } finally {
+      setSavingSelection(false);
     }
   }
 
-  function toggleModifier(modId: string) {
-    setSelectedModifiers((prev) =>
-      prev.includes(modId) ? prev.filter((id) => id !== modId) : [...prev, modId]
-    );
-  }
+  return (
+    <div className="min-h-screen overflow-x-hidden bg-[#FAF9F7] text-[#141414]">
+      <main className="mx-auto max-w-[1440px] px-5 pb-28 pt-16 sm:px-8 lg:px-10 lg:py-8">
+        <ProgressStepper steps={localizedSteps} ariaLabel={copy.checkoutProgress} />
 
-  function toggleExclusion(exclId: string) {
-    setSelectedExclusions((prev) =>
-      prev.includes(exclId) ? prev.filter((id) => id !== exclId) : [...prev, exclId]
-    );
-  }
-
-  /* ── cart helpers ── */
-  const cartCount = cartItems.reduce((s, it) => s + it.quantity, 0);
-
-  function cartQtyFor(itemId: string) {
-    return cartItems
-      .filter((i) => i.menuItemId === itemId)
-      .reduce((s, i) => s + i.quantity, 0);
-  }
-
-  /* ── dietary filter toggle ── */
-  function toggleDietary(tag: string) {
-    setDietaryFilter((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
-    );
-  }
-
-  const allDietaryTags = Array.from(
-    new Set(categories.flatMap((c) => c.items.flatMap((i) => i.dietaryTags)))
-  );
-
-  /* ═══════════════════════════════════════════
-     LOCATION SELECTION
-     ═══════════════════════════════════════════ */
-  if (step === "location") {
-    const stepLabels = isNl
-      ? ["Locatie", "Kies afhaaltijd", "Bestellen"]
-      : ["Location", "Choose pickup time", "Order"];
-
-    const currentStep = selectedSlot ? 3 : selectedLocation ? 2 : 1;
-
-    return (
-      <div className="space-y-8 pb-20 px-6 md:px-10">
-        {/* ── Progress Stepper ── */}
         <div className="pt-8">
-          <div className="flex items-center gap-0 max-w-2xl">
-            {stepLabels.map((label, idx) => {
-              const stepNum = idx + 1;
-              const isDone = currentStep > stepNum;
-              const isActive = currentStep === stepNum;
-              const isLast = idx === stepLabels.length - 1;
-              return (
-                <div key={idx} className="flex items-center flex-1">
-                  <div className="flex items-center gap-2 shrink-0">
-                    <div className={`w-7 h-7 flex items-center justify-center text-[12px] font-bold font-mono border transition-colors ${
-                      isDone
-                        ? "bg-logo-red border-logo-red text-foreground"
-                        : isActive
-                        ? "bg-logo-red border-logo-red text-foreground"
-                        : "bg-transparent border-gray-200 text-foreground/40"
-                    }`}>
-                      {isDone ? <Check className="w-3.5 h-3.5" /> : stepNum}
-                    </div>
-                    <span className={`hidden sm:inline text-[11px] font-mono uppercase tracking-wide whitespace-nowrap ${
-                      isDone || isActive ? "text-foreground" : "text-foreground/40"
-                    }`}>
-                      {label}
-                    </span>
-                    {isDone && (
-                      <Check className="w-3 h-3 text-logo-red hidden sm:block" />
-                    )}
-                  </div>
-                  {!isLast && (
-                    <div className={`h-px flex-1 mx-2 transition-colors ${
-                      currentStep > stepNum ? "bg-logo-red/60" : "bg-white/10"
-                    }`} />
-                  )}
-                </div>
-              );
-            })}
+          <section className="mx-auto max-w-[980px] space-y-6 lg:space-y-7" aria-labelledby="pickup-page-title">
+            <Hero copy={copy} />
+            <LocationCard
+              location={selectedLocation}
+              locations={locations}
+              pickerOpen={locationPickerOpen}
+              onPickerOpenChange={setLocationPickerOpen}
+              copy={copy}
+              onSelectLocation={(locationId) => {
+                setSelectedLocationId(locationId);
+                setLocationPickerOpen(false);
+              }}
+            />
+            <TimeSlotSelector selectedTime={selectedTime} onSelect={setSelectedTime} copy={copy} />
+            <StatusRow selectedDay={selectedDay} copy={copy} />
+            <AnotherDayCard
+              selectedDay={selectedDay}
+              selectedDate={selectedDate}
+              pickerOpen={dayPickerOpen}
+              onPickerOpenChange={setDayPickerOpen}
+              copy={copy}
+              onSelectDate={(date) => {
+                setSelectedDate(date);
+                setDayPickerOpen(false);
+              }}
+            />
+            <ContinueToMenuCard onContinue={saveSelectionAndContinue} copy={copy} disabled={savingSelection} />
+          </section>
+        </div>
+      </main>
+      <ReassuranceBar items={copy.reassuranceItems} />
+      <MobileContinueBar onContinue={saveSelectionAndContinue} copy={copy} disabled={savingSelection} />
+    </div>
+  );
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function Header() {
+  return (
+    <header className="hidden border-b border-[#E8E4DF] bg-white/82 backdrop-blur-md lg:block">
+      <div className="mx-auto flex max-w-[1440px] items-center justify-between px-5 py-4 sm:px-8 lg:px-10">
+        <Link
+          href="/en"
+          className="inline-flex items-center gap-3 rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#E30613]"
+          aria-label="Xin Chào home"
+        >
+          <Image
+            src="/images/logo.png"
+            alt="Xin Chào Vietnamese Street Food"
+            width={152}
+            height={58}
+            className="h-auto w-[132px] sm:w-[152px]"
+            priority
+          />
+        </Link>
+        <div className="hidden items-center gap-2 rounded-full border border-[#E8E4DF] bg-white px-4 py-2 text-sm font-medium text-[#6B6B6B] shadow-[0_8px_26px_rgba(20,20,20,0.04)] sm:flex">
+          <span className="h-2 w-2 rounded-full bg-[#1BA84A]" aria-hidden="true" />
+          Utrecht open until 21:30
+        </div>
+      </div>
+    </header>
+  );
+}
+
+function ProgressStepper({ steps, ariaLabel }: { steps: Step[]; ariaLabel: string }) {
+  return (
+    <nav aria-label={ariaLabel} className="pb-1">
+      <ol className="flex w-full items-center gap-2 sm:gap-3">
+        {steps.map((step, index) => {
+          const isComplete = step.status === "complete";
+          const isActive = step.status === "active";
+
+          return (
+            <li key={step.id} className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
+              <div className="flex min-w-0 items-center gap-2">
+                <span
+                  className={[
+                    "flex h-9 w-9 shrink-0 items-center justify-center rounded-full border text-sm font-semibold transition-colors sm:h-8 sm:w-8",
+                    isActive ? "border-[#E30613] bg-[#E30613] text-white" : "",
+                    isComplete ? "border-[#E30613] bg-white text-[#E30613]" : "",
+                    !isActive && !isComplete ? "border-[#E8E4DF] bg-white text-[#9C9690]" : "",
+                  ].join(" ")}
+                  aria-current={isActive ? "step" : undefined}
+                >
+                  {isComplete ? <Check className="h-4 w-4" aria-hidden="true" /> : step.id}
+                </span>
+                <span
+                  className={[
+                    "truncate text-sm font-semibold",
+                    !isActive && !isComplete ? "hidden sm:inline" : "",
+                    isActive || isComplete ? "text-[#141414]" : "text-[#8B8580]",
+                  ].join(" ")}
+                >
+                  {step.label}
+                </span>
+              </div>
+              {index < steps.length - 1 && (
+                <div className="h-px min-w-5 flex-1 bg-[#E8E4DF]" aria-hidden="true" />
+              )}
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
+  );
+}
+
+function Hero({ copy }: { copy: OrderCopy }) {
+  return (
+    <section className="overflow-hidden rounded-[24px] bg-[#FAF9F7] py-2 lg:py-4">
+      <div>
+        <h1
+          id="pickup-page-title"
+          className="max-w-[760px] text-[26px] font-extrabold leading-[1.08] text-[#141414] min-[380px]:text-[30px] sm:text-[38px] lg:text-[46px] xl:text-[54px]"
+        >
+          <span className="block whitespace-nowrap">{copy.heroLine1}</span>
+          <span className="block whitespace-nowrap">{copy.heroLine2}</span>
+        </h1>
+        <p className="mt-4 max-w-[520px] text-[15px] leading-7 text-[#6B6B6B] sm:text-base">
+          {copy.heroSubtitle}
+        </p>
+      </div>
+    </section>
+  );
+}
+
+function LocationCard({
+  location,
+  locations,
+  pickerOpen,
+  onPickerOpenChange,
+  copy,
+  onSelectLocation,
+}: {
+  location: PickupLocation;
+  locations: PickupLocation[];
+  pickerOpen: boolean;
+  onPickerOpenChange: (open: boolean) => void;
+  copy: OrderCopy;
+  onSelectLocation: (locationId: string) => void;
+}) {
+  return (
+    <section className="rounded-[24px] border border-[#E8E4DF] bg-white p-5 shadow-[0_18px_50px_rgba(20,20,20,0.06)] sm:p-6">
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex min-w-0 items-start gap-4">
+          <Image
+            src={location.imageSrc}
+            alt={`${location.name} exterior`}
+            width={88}
+            height={88}
+            className="h-20 w-20 shrink-0 rounded-2xl object-cover sm:h-[88px] sm:w-[88px]"
+          />
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <h2 className="text-lg font-bold leading-tight text-[#141414]">{location.name}</h2>
+              <span className="inline-flex items-center gap-1.5 text-sm font-medium text-[#1BA84A]">
+                <span className="h-2 w-2 rounded-full bg-[#1BA84A]" aria-hidden="true" />
+                {copy.open}
+              </span>
+            </div>
+            <p className="mt-2 flex items-center gap-2 text-sm text-[#6B6B6B]">
+              <MapPin className="h-4 w-4 shrink-0" aria-hidden="true" />
+              {location.address}
+            </p>
+            <p className="mt-1.5 flex items-center gap-2 text-sm text-[#6B6B6B]">
+              <Clock3 className="h-4 w-4 shrink-0" aria-hidden="true" />
+              {copy.openTodayUntil} {location.openUntil}
+            </p>
           </div>
         </div>
+        <button
+          type="button"
+          aria-expanded={pickerOpen}
+          aria-controls="location-picker"
+          onClick={() => onPickerOpenChange(!pickerOpen)}
+          className="flex min-h-11 max-w-full items-center justify-center gap-2 self-stretch rounded-2xl border border-[#E8E4DF] bg-white px-4 py-3 text-sm font-semibold text-[#141414] transition hover:border-[#E30613]/35 hover:bg-[#FFF6F6] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[#E30613] sm:inline-flex sm:self-start lg:self-auto"
+        >
+          <LocateFixed className="h-4 w-4 text-[#6B6B6B]" aria-hidden="true" />
+          {copy.changeLocation}
+        </button>
+      </div>
+      {pickerOpen && (
+        <div id="location-picker" className="mt-5 grid gap-3 border-t border-[#E8E4DF] pt-5 sm:grid-cols-2">
+          {locations.map((option) => {
+            const selected = option.id === location.id;
 
-        {/* ── Header ── */}
-        <div className="space-y-1">
-          <p className="text-[13px] text-gray-400 font-mono tracking-wide">
-            {isNl ? "Kies waar je wilt bestellen" : "Choose where you'd like to order"}
-          </p>
-        </div>
-
-        {/* ── Location Cards ── */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
-          {locations.map((loc) => {
-            const selected = selectedLocation === loc.id;
             return (
               <button
-                key={loc.id}
-                onClick={() => setSelectedLocation(loc.id)}
-                className={`relative text-left bg-surface overflow-hidden transition-all group ${
-                  selected
-                    ? "ring-2 ring-logo-red shadow-[0_0_20px_rgba(255,26,26,0.25)]"
-                    : "border border-gray-200 hover:border-gray-200"
-                }`}
+                key={option.id}
+                type="button"
+                aria-pressed={selected}
+                onClick={() => onSelectLocation(option.id)}
+                className={[
+                  "flex min-h-[112px] items-center gap-4 rounded-[20px] border bg-white p-4 text-left transition hover:-translate-y-0.5 hover:border-[#E30613]/45 hover:bg-[#FFF6F6] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[#E30613]",
+                  selected ? "border-[#E30613] ring-4 ring-[#E30613]/8" : "border-[#E8E4DF]",
+                ].join(" ")}
               >
-                {/* Top-right checkmark badge when selected */}
-                {selected && (
-                  <div className="absolute top-3 right-3 z-20 w-6 h-6 bg-logo-red flex items-center justify-center">
-                    <Check className="w-4 h-4 text-foreground" strokeWidth={3} />
-                  </div>
-                )}
-
-                {/* OPEN NOW badge */}
-                <div className="absolute top-3 left-3 z-20">
-                  <span className="inline-block bg-logo-red text-foreground text-[10px] font-bold font-mono tracking-[0.08em] uppercase px-2.5 py-1">
-                    OPEN NOW
+                <Image
+                  src={option.imageSrc}
+                  alt={`${option.name} exterior`}
+                  width={72}
+                  height={72}
+                  className="h-[72px] w-[72px] shrink-0 rounded-2xl object-cover"
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block font-bold text-[#141414]">{option.name}</span>
+                  <span className="mt-1 block text-sm leading-5 text-[#6B6B6B]">{option.address}</span>
+                  <span className="mt-1.5 inline-flex items-center gap-1.5 text-sm font-medium text-[#1BA84A]">
+                    <span className="h-2 w-2 rounded-full bg-[#1BA84A]" aria-hidden="true" />
+                    {copy.openUntil} {option.openUntil}
                   </span>
-                </div>
-
-                {/* Hero image */}
-                <div className="relative w-full aspect-[4/3] overflow-hidden">
-                  <Image
-                    src="/images/hero-pho.jpg"
-                    alt={loc.name}
-                    fill
-                    className="object-cover"
-                    sizes="(max-width: 768px) 100vw, 50vw"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#1a1a1a] via-[#1a1a1a]/20 to-transparent" />
-                </div>
-
-                {/* Info + Button */}
-                <div className="px-4 py-4 space-y-3">
-                  <h3 className="font-display text-[18px] font-bold uppercase text-foreground tracking-tight">
-                    {loc.name}
-                  </h3>
-                  <div className="flex items-start gap-1.5 text-[12px] text-foreground/60">
-                    <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                    <span className="leading-relaxed">{loc.address}</span>
-                  </div>
-                  <div className={`inline-flex items-center justify-center w-full py-2.5 text-[11px] font-bold font-mono tracking-[0.1em] uppercase transition-all ${
-                    selected
-                      ? "bg-logo-red text-foreground"
-                      : "border border-logo-red text-logo-red bg-transparent hover:bg-logo-red/10"
-                  }`}>
-                    {selected ? (
-                      <span className="flex items-center gap-2">
-                        <Check className="w-3.5 h-3.5" /> {isNl ? "Geselecteerd" : "Selected"}
-                      </span>
-                    ) : (
-                      isNl ? "Kies locatie" : "Choose location"
-                    )}
-                  </div>
-                </div>
+                </span>
+                {selected && (
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#E30613] text-white">
+                    <Check className="h-4 w-4" aria-hidden="true" />
+                  </span>
+                )}
               </button>
             );
           })}
         </div>
+      )}
+      <div className="mt-6 border-t border-[#E8E4DF]" />
+    </section>
+  );
+}
 
-        {/* ── Order Summary + Time Picker ── */}
-        {selectedLocation && (
-          <div className="space-y-8">
-            <TimeSlotPicker
-              slots={slots}
-              selectedSlot={selectedSlot}
-              onSelect={(id) => setSelectedSlot(id)}
-              locale={locale}
-            />
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  /* ── filtered categories ── */
-  const filteredCategories = (() => {
-    let cats = dietaryFilter.length > 0
-      ? categories.map((c) => ({
-          ...c,
-          items: c.items.filter((i) => dietaryFilter.every((tag) => i.dietaryTags.includes(tag))),
-        })).filter((c) => c.items.length > 0)
-      : categories;
-    if (activeCat) {
-      cats = cats.filter((c) => c.id === activeCat);
-    }
-    return cats;
-  })();
-
-  const locName = locations.find((l) => l.id === selectedLocation)?.name || "";
-  const slotDate = fmtDate(slots.find((s) => s.id === selectedSlot)?.date || "", locale);
-  const slotTime = slots.find((s) => s.id === selectedSlot)?.time || "";
-
-  /* ═══════════════════════════════════════════
-     MENU BROWSING + CART
-     ═══════════════════════════════════════════ */
+function TimeSlotSelector({
+  selectedTime,
+  onSelect,
+  copy,
+}: {
+  selectedTime: string;
+  onSelect: (time: string) => void;
+  copy: OrderCopy;
+}) {
   return (
-    <div className="flex flex-col lg:flex-row lg:h-[calc(100vh-80px)] lg:min-h-0">
-      {/* ═══════ LEFT PANEL ═══════ */}
-      <div className="flex-1 min-w-0 lg:overflow-y-auto pb-8">
+    <section aria-labelledby="time-slots-heading" className="space-y-3">
+      <h2 id="time-slots-heading" className="text-xl font-extrabold text-[#141414]">
+        {copy.choosePickupTime}
+      </h2>
+      <div className="-mx-5 overflow-x-auto px-5 pb-2 sm:mx-0 sm:px-0">
+        <div className="flex min-w-max items-stretch gap-3">
+          {timeSlots.map((slot) => {
+            const selected = selectedTime === slot.time;
 
-        {/* ── Order Summary Banner ── */}
-        <div className="pt-6">
-          <OrderSummary
-            locationName={locName}
-            date={slotDate}
-            time={slotTime}
-            locale={locale}
-            onChange={() => { setStep("location"); setActiveCat(null); }}
-          />
-        </div>
-
-        {/* ── Hero Header ── */}
-        <div className="px-6 pt-4 pb-2">
-          <div className="flex items-end justify-between mb-1">
-            <div>
-              <h1 className="font-display text-[56px] md:text-[80px] leading-[0.85] uppercase text-logo-red tracking-tight">
-                {isNl ? "MENU" : "MENU"}
-              </h1>
-              <p className="text-logo-gold text-[11px] font-mono tracking-[0.18em] uppercase mt-2">
-                {isNl
-                  ? "Authentic street food flavours / fresh daily"
-                  : "Authentic street food flavours / fresh daily"}
-              </p>
-            </div>
-            <button
-              onClick={() => setDietaryFilter(dietaryFilter.length > 0 ? [] : allDietaryTags.slice(0, 1))}
-              className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 text-foreground/70 text-[11px] font-mono uppercase tracking-[0.1em] hover:border-border-default hover:text-foreground transition-colors"
-            >
-              <SlidersHorizontal className="w-3.5 h-3.5" />
-              {isNl ? "Filter" : "Filter"}
-            </button>
-          </div>
-
-          {/* Dietary filter chips */}
-          {allDietaryTags.length > 0 && (
-            <div className="flex flex-wrap gap-2 mt-3">
-              {allDietaryTags.map((tag) => (
-                <button
-                  key={tag}
-                  onClick={() => toggleDietary(tag)}
-                  className={`px-2.5 py-1 text-[10px] font-mono uppercase tracking-[0.08em] border transition-colors ${
-                    dietaryFilter.includes(tag)
-                      ? "bg-logo-red border-logo-red text-black"
-                      : "border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-400"
-                  }`}
-                >
-                  {tag}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* ── Pickup info bar ── */}
-        <div className="px-6 pb-4 flex items-center gap-2 text-gray-500 text-[11px] font-mono">
-          <MapPin className="w-3 h-3" />
-          <span>{locName}</span>
-          <span className="text-gray-400">·</span>
-          <Clock className="w-3 h-3" />
-          <span>{slotDate} {slotTime}</span>
+            return (
+              <button
+                key={slot.time}
+                type="button"
+                disabled={slot.disabled}
+                aria-pressed={selected}
+                onClick={() => onSelect(slot.time)}
+                className={[
+                  "relative min-h-12 min-w-[86px] rounded-2xl border px-4 py-2 text-center text-[15px] font-bold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[#E30613] disabled:cursor-not-allowed disabled:border-[#E8E4DF] disabled:bg-[#F4F1ED] disabled:text-[#B8B0A8]",
+                  selected
+                    ? "border-[#E30613] bg-[#E30613] text-white shadow-[0_14px_34px_rgba(227,6,19,0.24)]"
+                    : "border-[#E8E4DF] bg-white text-[#141414] hover:border-[#E30613]/45 hover:bg-[#FFF6F6]",
+                ].join(" ")}
+              >
+                <span className="flex items-center justify-center gap-1.5">
+                  {slot.time}
+                  {selected && <Check className="h-4 w-4" aria-hidden="true" />}
+                </span>
+                {selected && slot.recommended && (
+                  <span className="mt-0.5 block text-[10px] font-semibold leading-none text-white/85">
+                    {copy.recommended}
+                  </span>
+                )}
+              </button>
+            );
+          })}
           <button
-            onClick={() => { setStep("location"); setActiveCat(null); }}
-            className="ml-auto text-logo-red hover:text-foreground transition-colors underline underline-offset-2"
+            type="button"
+            aria-label={copy.showLaterTimes}
+            className="flex min-h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[#E8E4DF] bg-white text-[#141414] transition hover:border-[#E30613]/45 hover:bg-[#FFF6F6] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[#E30613]"
           >
-            {isNl ? "Wijzigen" : "Change"}
+            <ChevronRight className="h-5 w-5" aria-hidden="true" />
           </button>
         </div>
-
-        {/* ── Category pills ── */}
-        <div className="px-6 pb-4">
-          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-            <button
-              onClick={() => setActiveCat(null)}
-              className={`shrink-0 px-4 py-2 text-[11px] font-bold font-mono uppercase tracking-[0.1em] border transition-colors ${
-                activeCat === null
-                  ? "bg-logo-red border-logo-red text-black"
-                  : "bg-white border-gray-200 text-foreground hover:border-gray-300"
-              }`}
-            >
-              {isNl ? "Alles" : "All"}
-            </button>
-            {categories.map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => setActiveCat(activeCat === cat.id ? null : cat.id)}
-                className={`shrink-0 px-4 py-2 text-[11px] font-bold font-mono uppercase tracking-[0.1em] border transition-colors ${
-                  activeCat === cat.id
-                    ? "bg-logo-red border-logo-red text-black"
-                    : "bg-white border-gray-200 text-foreground hover:border-gray-300"
-                }`}
-              >
-                {cat.name}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* ── Category sections ── */}
-        <div className="px-6 pb-12 space-y-10">
-          {filteredCategories.map((cat, catIdx) => {
-            const isEven = catIdx % 2 === 0; // 0,2 = pink; 1,3 = lime
-            const headerColor = isEven ? "text-foreground" : "text-logo-gold";
-            const priceTagBg = isEven ? "bg-logo-red" : "bg-logo-gold";
-            const numColor = isEven ? "text-logo-red" : "text-logo-gold";
-            const isLast = catIdx === filteredCategories.length - 1;
-            const itemCount = cat.items.length + (isLast ? 1 : 0); // +1 for promo card
-
-            return (
-              <section key={cat.id}>
-                {/* Section header */}
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-1.5 h-7 bg-logo-red shrink-0" />
-                    <h2 className={`font-display text-[22px] md:text-[26px] uppercase tracking-tight ${headerColor}`}>
-                      {cat.name}
-                    </h2>
-                  </div>
-                  <span className={`font-mono text-[13px] ${numColor} tracking-wide`}>
-                    {String(catIdx + 1).padStart(2, "0")}
-                  </span>
-                </div>
-
-                {/* Product grid (2-col) */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {cat.items.map((item) => {
-                    const inCartQty = cartQtyFor(item.id);
-                    const img = item.imageUrl;
-                    const name = isNl && item.nameNl ? item.nameNl : item.name;
-                    const desc = isNl && item.shortDescriptionNl
-                      ? item.shortDescriptionNl
-                      : item.shortDescription || item.description;
-                    const displayPrice = item.salePrice && item.salePrice < item.price
-                      ? item.salePrice
-                      : item.price;
-
-                    const isUnavailable = !item.isAvailable;
-                    const canAddToCart = item.isAvailable && !item.isDineInOnly;
-
-                    return (
-                      <div
-                        key={item.id}
-                        className={`group text-left w-full ${isUnavailable ? "opacity-60" : ""}`}
-                      >
-                        {/* Image */}
-                        <div
-                          className={`relative aspect-[4/3] overflow-hidden bg-surface-container ${canAddToCart ? "cursor-pointer" : "cursor-not-allowed"}`}
-                          onClick={() => {
-                            if (!canAddToCart) return;
-                            setSelectedItem(item);
-                            setSelectedVariant(item.variants[0]?.id || "");
-                            setSelectedModifiers([]);
-                            setSelectedExclusions([]);
-                          }}
-                        >
-                          {img ? (
-                            <img
-                              src={img}
-                              alt={name}
-                              className={`w-full h-full object-cover ${item.isAvailable ? "group-hover:scale-105 transition-transform duration-700" : "grayscale"}`}
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-surface-container">
-                              <Utensils className="w-8 h-8 text-gray-400" />
-                            </div>
-                          )}
-                          {isUnavailable && (
-                            <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
-                              <span className="bg-black/70 text-white text-[10px] font-bold font-mono uppercase tracking-[0.1em] px-3 py-1.5">
-                                {isNl ? "Niet beschikbaar" : "Not available"}
-                              </span>
-                            </div>
-                          )}
-                          {item.isAvailable && item.isDineInOnly && (
-                            <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
-                              <span className="bg-brand-gold/90 text-black text-[10px] font-bold font-mono uppercase tracking-[0.1em] px-3 py-1.5">
-                                {isNl ? "Alleen Dine-In" : "Dine-In only"}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Info */}
-                        <div
-                          className={`pt-3 pb-1 ${canAddToCart ? "cursor-pointer" : "cursor-not-allowed"}`}
-                          onClick={() => {
-                            if (!canAddToCart) return;
-                            setSelectedItem(item);
-                            setSelectedVariant(item.variants[0]?.id || "");
-                            setSelectedModifiers([]);
-                            setSelectedExclusions([]);
-                          }}
-                        >
-                          <div className="flex items-center gap-1.5">
-                            <h3 className={`font-bold text-[14px] uppercase tracking-wide leading-tight ${isUnavailable ? "text-gray-400" : "text-foreground"}`}>
-                              {name}
-                            </h3>
-                            {item.isSpicy && !isUnavailable && (
-                              <Flame className="w-3.5 h-3.5 text-red-500 shrink-0" />
-                            )}
-                          </div>
-                          <p className={`text-[12px] mt-1 leading-relaxed line-clamp-2 ${isUnavailable ? "text-gray-400" : "text-gray-500"}`}>
-                            {desc}
-                          </p>
-
-                          {/* Price + quick-add row */}
-                          <div className="flex items-center justify-between mt-2">
-                            <span className={`font-bold text-[14px] font-mono ${isUnavailable ? "text-gray-400" : "text-foreground"}`}>
-                              {fmtPrice(displayPrice)}
-                            </span>
-                            {canAddToCart ? (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleQuickAdd(item);
-                                }}
-                                className="w-7 h-7 border border-logo-red text-logo-red flex items-center justify-center hover:bg-logo-red hover:text-black transition-all"
-                              >
-                                <Plus className="w-4 h-4" />
-                              </button>
-                            ) : item.isDineInOnly && item.isAvailable ? (
-                              <span className="text-[10px] font-mono text-brand-gold uppercase tracking-wider">
-                                {isNl ? "Alleen Dine-In" : "Dine-In only"}
-                              </span>
-                            ) : (
-                              <span className="text-[10px] font-mono text-gray-400 uppercase tracking-wider">
-                                {isNl ? "Uitverkocht" : "Sold out"}
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Tags + cart qty */}
-                          <div className="flex items-center justify-between mt-1.5">
-                            <div className="flex flex-wrap gap-x-2 gap-y-0.5">
-                              {item.dietaryTags.map((tag) => (
-                                <span
-                                  key={tag}
-                                  className="text-[9px] text-gray-400 uppercase tracking-wider font-mono"
-                                >
-                                  {tag}
-                                </span>
-                              ))}
-                            </div>
-                            {inCartQty > 0 && (
-                              <span className="text-[10px] font-mono text-logo-red font-bold">
-                                {inCartQty}x in cart
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-
-
-                </div>
-              </section>
-            );
-          })}
-        </div>
       </div>
+    </section>
+  );
+}
 
-      {/* ═══════ DESKTOP CART SIDEBAR ═══════ */}
-      {/* Desktop: always visible sidebar */}
-      <div className="hidden lg:flex w-[340px] shrink-0 border-l border-gray-200 bg-surface flex-col">
-        <div className="px-5 py-5 border-b border-gray-200">
-          <h2 className="font-display text-[20px] uppercase tracking-tight text-foreground">
-            {isNl ? "Mijn bestelling" : "My Order"}
-          </h2>
-          <p className="font-mono text-[11px] text-gray-500 mt-1 flex items-center gap-1">
-            <MapPin className="w-3 h-3" />
-            {isNl ? "Lokaal afhalen" : "Take Out"} &middot; {locName}
-          </p>
-        </div>
+function StatusRow({ selectedDay, copy }: { selectedDay: PickupDay; copy: OrderCopy }) {
+  const orderCutoffLabel = selectedDay.summaryLabel === "Today" || selectedDay.summaryLabel === "Vandaag" ? copy.today : selectedDay.summaryLabel;
 
-        {/* Cart items */}
-        <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4">
-          {cartItems.length === 0 ? (
-            <div className="text-center py-16">
-              <ShoppingCart className="w-10 h-10 text-gray-400 mx-auto mb-3" />
-              <p className="text-gray-500 text-[13px] font-mono">
-                {isNl ? "Je winkelwagen is leeg" : "Your cart is empty"}
-              </p>
-              <p className="text-gray-400 text-[11px] mt-1 font-mono">
-                {isNl ? "Tap een gerecht om toe te voegen" : "Tap a dish to add it"}
-              </p>
-            </div>
-          ) : (
-            cartItems.map((item) => (
-              <div key={`${item.menuItemId}-${item.variantId || "v"}-${(item.modifierIds || []).join(",")}-${(item.exclusionIds || []).join(",")}`} className="flex items-center gap-3">
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <button
-                    onClick={() => decreaseItem(item.menuItemId)}
-                    className="w-7 h-7 border border-gray-200 flex items-center justify-center text-gray-400 hover:text-foreground hover:border-border-default transition-colors"
-                  >
-                    <Minus className="w-3 h-3" />
-                  </button>
-                  <span className="text-foreground font-bold text-[13px] w-5 text-center">{item.quantity}</span>
-                  <button
-                    onClick={() =>
-                      addItem({
-                        menuItemId: item.menuItemId,
-                        name: item.name,
-                        price: item.price,
-                        variantId: item.variantId,
-                        variantName: item.variantName,
-                        modifierIds: item.modifierIds,
-                        modifierNames: item.modifierNames,
-                        exclusionIds: item.exclusionIds,
-                        exclusionNames: item.exclusionNames,
-                      })
-                    }
-                    className="w-7 h-7 bg-logo-red flex items-center justify-center text-black hover:brightness-110 transition-all"
-                  >
-                    <Plus className="w-3 h-3" />
-                  </button>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-foreground text-[13px] truncate">{item.name}</p>
-                  {item.variantName && (
-                    <p className="text-[10px] text-gray-500">{item.variantName}</p>
-                  )}
-                  {item.modifierNames && item.modifierNames.length > 0 && (
-                    <p className="text-[10px] text-gray-500 truncate">
-                      {item.modifierNames.join(", ")}
-                    </p>
-                  )}
-                  {item.exclusionNames && item.exclusionNames.length > 0 && (
-                    <p className="text-[10px] text-brand-gold truncate">
-                      {item.exclusionNames.join(", ")}
-                    </p>
-                  )}
-                </div>
-                <span className="text-gray-400 text-[13px] shrink-0 font-mono">
-                  {fmtPrice(item.price * item.quantity)}
-                </span>
-              </div>
-            ))
-          )}
-        </div>
+  return (
+    <div className="flex flex-col gap-3 rounded-[20px] border border-[#E8E4DF] bg-white px-5 py-4 text-sm font-medium text-[#6B6B6B] sm:flex-row sm:items-center sm:gap-5">
+      <p className="flex items-center gap-2 text-[#E30613]">
+        <Soup className="h-4 w-4" aria-hidden="true" />
+        <span>{copy.kitchenBusy}</span>
+      </p>
+      <div className="hidden h-5 w-px bg-[#E8E4DF] sm:block" aria-hidden="true" />
+      <p className="flex items-center gap-2">
+        <Clock3 className="h-4 w-4" aria-hidden="true" />
+        <span>{copy.orderBefore} {orderCutoffLabel}</span>
+      </p>
+    </div>
+  );
+}
 
-        {/* Footer */}
-        {cartItems.length > 0 && (
-          <div className="px-5 py-5 border-t border-gray-200 space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="font-mono text-[12px] text-gray-400 uppercase tracking-wide">
-                {isNl ? "Totaal" : "Total"}
-              </span>
-              <span className="text-foreground text-[26px] font-bold">{fmtPrice(cartTotal)}</span>
-            </div>
-            <Link
-              href={`/${locale}/checkout`}
-              className="block w-full py-4 bg-logo-red text-black font-bold text-center text-[13px] tracking-[0.08em] uppercase hover:brightness-110 transition-all"
-            >
-              {isNl ? "AFREKENEN" : "CHECKOUT"} &rarr;
-            </Link>
-          </div>
-        )}
-      </div>
-
-      {/* ═══════ MOBILE CART FAB ═══════ */}
-      {/* Mobile: floating cart button with badge */}
-      <button
-        onClick={() => setCartOpen(true)}
-        className="lg:hidden fixed bottom-6 right-6 z-40 w-14 h-14 flex items-center justify-center bg-logo-red transition-all shadow-lg"
-        style={{ borderRadius: "50%" }}
-      >
-        <ShoppingCart className="w-6 h-6 text-black" />
-        {cartCount > 0 && (
-          <span
-            className="absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center bg-white text-black font-bold text-[11px]"
-            style={{ borderRadius: "50%" }}
-          >
-            {cartCount}
+function AnotherDayCard({
+  selectedDay,
+  selectedDate,
+  pickerOpen,
+  onPickerOpenChange,
+  copy,
+  onSelectDate,
+}: {
+  selectedDay: PickupDay;
+  selectedDate: string;
+  pickerOpen: boolean;
+  onPickerOpenChange: (open: boolean) => void;
+  copy: OrderCopy;
+  onSelectDate: (date: string) => void;
+}) {
+  return (
+    <section className="rounded-[22px] border border-[#E8E4DF] bg-white p-5 shadow-[0_12px_34px_rgba(20,20,20,0.04)]">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-4">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[#E8E4DF] bg-white text-[#141414]">
+            <Calendar className="h-5 w-5" aria-hidden="true" />
           </span>
-        )}
-      </button>
-
-      {/* ═══════ MOBILE CART DRAWER ═══════ */}
-
-      {/* ═══════ MOBILE CART DRAWER ═══════ */}
-      {cartOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 flex flex-col justify-end">
-          {/* Backdrop */}
-          <div className="absolute inset-0 bg-black/80" onClick={() => setCartOpen(false)} />
-          {/* Drawer */}
-          <div className="relative bg-surface border-t border-gray-200 w-full max-h-[80vh] flex flex-col">
-            {/* Drag handle */}
-            <div className="flex justify-center py-3">
-              <div
-                className="w-10 h-1 bg-white/20"
-                onClick={() => setCartOpen(false)}
-                style={{ borderRadius: "4px" }}
+          <div>
+            <h2 className="text-[17px] font-bold text-[#141414]">{copy.dayPickerTitle}</h2>
+            <p className="mt-1 text-sm text-[#6B6B6B]">
+              {selectedDay.summaryLabel === "Today" || selectedDay.summaryLabel === "Vandaag"
+                ? copy.viewHours
+                : `${copy.pickupDay}: ${selectedDay.summaryLabel}.`}
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          aria-expanded={pickerOpen}
+          aria-controls="pickup-day-picker"
+          onClick={() => onPickerOpenChange(!pickerOpen)}
+          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-[#E8E4DF] bg-white px-4 py-3 text-sm font-semibold text-[#141414] transition hover:border-[#E30613]/35 hover:bg-[#FFF6F6] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[#E30613]"
+        >
+          {copy.chooseAnotherDay}
+          <ChevronRight className="h-4 w-4" aria-hidden="true" />
+        </button>
+      </div>
+      {pickerOpen && (
+        <div id="pickup-day-picker" className="mt-5 border-t border-[#E8E4DF] pt-5">
+          <label className="block" htmlFor="pickup-date">
+            <span className="text-sm font-bold text-[#141414]">{copy.pickupDate}</span>
+            <span className="mt-1 block text-sm text-[#6B6B6B]">{selectedDay.helper}</span>
+          </label>
+          <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="relative max-w-sm flex-1">
+              <Calendar className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#E30613]" aria-hidden="true" />
+              <input
+                id="pickup-date"
+                type="date"
+                min={todayInputValue}
+                value={selectedDate}
+                onChange={(event) => onSelectDate(event.target.value)}
+                onInput={(event) => onSelectDate(event.currentTarget.value)}
+                className="min-h-14 w-full rounded-2xl border border-[#E8E4DF] bg-white px-12 py-3 text-base font-semibold text-[#141414] transition hover:border-[#E30613]/45 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[#E30613]"
               />
             </div>
-
-            {/* Header */}
-            <div className="px-5 pb-3 flex items-center justify-between">
-              <div>
-                <h2 className="font-display text-[20px] uppercase tracking-tight text-foreground">
-                  {isNl ? "Mijn bestelling" : "My Order"}
-                </h2>
-                <p className="font-mono text-[11px] text-gray-500 mt-1 flex items-center gap-1">
-                  <MapPin className="w-3 h-3" />
-                  {isNl ? "Lokaal afhalen" : "Take Out"} &middot; {locName}
-                </p>
-              </div>
-              <button
-                onClick={() => setCartOpen(false)}
-                className="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-foreground transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Cart items */}
-            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-              {cartItems.length === 0 ? (
-                <div className="text-center py-12">
-                  <ShoppingCart className="w-10 h-10 text-gray-400 mx-auto mb-3" />
-                  <p className="text-gray-500 text-[13px] font-mono">
-                    {isNl ? "Je winkelwagen is leeg" : "Your cart is empty"}
-                  </p>
-                  <p className="text-gray-400 text-[11px] mt-1 font-mono">
-                    {isNl ? "Tap een gerecht om toe te voegen" : "Tap a dish to add it"}
-                  </p>
-                </div>
-              ) : (
-                cartItems.map((item) => (
-                  <div key={`${item.menuItemId}-${item.variantId || "v"}-${(item.modifierIds || []).join(",")}-${(item.exclusionIds || []).join(",")}`} className="flex items-center gap-3">
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <button
-                        onClick={() => decreaseItem(item.menuItemId)}
-                        className="w-7 h-7 border border-gray-200 flex items-center justify-center text-gray-400 hover:text-foreground hover:border-border-default transition-colors"
-                      >
-                        <Minus className="w-3 h-3" />
-                      </button>
-                      <span className="text-foreground font-bold text-[13px] w-5 text-center">{item.quantity}</span>
-                      <button
-                        onClick={() =>
-                          addItem({
-                            menuItemId: item.menuItemId,
-                            name: item.name,
-                            price: item.price,
-                            variantId: item.variantId,
-                            variantName: item.variantName,
-                            modifierIds: item.modifierIds,
-                            modifierNames: item.modifierNames,
-                            exclusionIds: item.exclusionIds,
-                            exclusionNames: item.exclusionNames,
-                          })
-                        }
-                        className="w-7 h-7 bg-logo-red flex items-center justify-center text-black hover:brightness-110 transition-all"
-                      >
-                        <Plus className="w-3 h-3" />
-                      </button>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-foreground text-[13px] truncate">{item.name}</p>
-                      {item.variantName && (
-                        <p className="text-[10px] text-gray-500">{item.variantName}</p>
-                      )}
-                      {item.modifierNames && item.modifierNames.length > 0 && (
-                        <p className="text-[10px] text-gray-500 truncate">
-                          {item.modifierNames.join(", ")}
-                        </p>
-                      )}
-                      {item.exclusionNames && item.exclusionNames.length > 0 && (
-                        <p className="text-[10px] text-brand-gold truncate">
-                          {item.exclusionNames.join(", ")}
-                        </p>
-                      )}
-                    </div>
-                    <span className="text-gray-400 text-[13px] shrink-0 font-mono">
-                      {fmtPrice(item.price * item.quantity)}
-                    </span>
-                  </div>
-                ))
-              )}
-            </div>
-
-            {/* Footer */}
-            {cartItems.length > 0 && (
-              <div className="px-5 py-5 border-t border-gray-200 space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="font-mono text-[12px] text-gray-400 uppercase tracking-wide">
-                    {isNl ? "Totaal" : "Total"}
-                  </span>
-                  <span className="text-foreground text-[26px] font-bold">{fmtPrice(cartTotal)}</span>
-                </div>
-                <Link
-                  href={`/${locale}/checkout`}
-                  className="block w-full py-4 bg-logo-red text-black font-bold text-center text-[13px] tracking-[0.08em] uppercase hover:brightness-110 transition-all"
-                  onClick={() => setCartOpen(false)}
-                >
-                  {isNl ? "AFREKENEN" : "CHECKOUT"} &rarr;
-                </Link>
-              </div>
-            )}
+            <p className="rounded-2xl bg-[#FAF9F7] px-4 py-3 text-sm font-medium text-[#6B6B6B]">
+              {copy.weShowSlots}
+            </p>
           </div>
         </div>
       )}
+    </section>
+  );
+}
 
-      {/* ═══════ ITEM MODAL ═══════ */}
-      {selectedItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/80" onClick={() => setSelectedItem(null)} />
-          <div className="relative bg-surface-container border border-gray-200 w-full max-w-[440px] max-h-[90vh] overflow-y-auto">
-            {/* Image */}
-            <div className="h-52 w-full relative">
-              {selectedItem.imageUrl ? (
-                <img src={selectedItem.imageUrl} alt={selectedItem.name} className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full bg-surface flex items-center justify-center text-gray-400">
-                  <Utensils className="w-12 h-12" />
-                </div>
-              )}
-              <button
-                onClick={() => setSelectedItem(null)}
-                className="absolute top-3 right-3 w-8 h-8 bg-black/70 text-foreground flex items-center justify-center hover:bg-black/90 transition-colors border border-gray-200"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+function ContinueToMenuCard({ onContinue, copy, disabled }: { onContinue: () => void; copy: OrderCopy; disabled: boolean }) {
+  return (
+    <section className="hidden rounded-[24px] border border-[#E8E4DF] bg-white p-5 shadow-[0_12px_34px_rgba(20,20,20,0.04)] md:block">
+      <button
+        type="button"
+        onClick={onContinue}
+        disabled={disabled}
+        className="inline-flex min-h-14 w-full items-center justify-center gap-3 rounded-2xl bg-[#E30613] px-5 py-4 text-base font-bold text-white shadow-[0_16px_34px_rgba(227,6,19,0.22)] transition hover:bg-[#C90511] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[#E30613] disabled:cursor-wait disabled:opacity-70"
+      >
+        {copy.continueToMenu}
+        <ArrowRight className="h-5 w-5" aria-hidden="true" />
+      </button>
+    </section>
+  );
+}
 
-            <div className="p-5 space-y-5">
-              {/* Title + price */}
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-display text-[20px] uppercase tracking-tight text-foreground leading-none">
-                    {isNl && selectedItem.nameNl ? selectedItem.nameNl : selectedItem.name}
-                  </h3>
-                  <p className="text-[13px] text-gray-400 mt-1.5">
-                    {isNl && selectedItem.shortDescriptionNl
-                      ? selectedItem.shortDescriptionNl
-                      : selectedItem.shortDescription || selectedItem.description}
-                  </p>
-                </div>
-                <span className="text-brand-gold font-bold text-[18px] shrink-0">
-                  {fmtPrice(getItemPrice(selectedItem) + getModifierTotal(selectedItem))}
-                </span>
-              </div>
+function ReassuranceBar({ items }: { items: ReassuranceItem[] }) {
+  return (
+    <footer className="border-t border-[#E8E4DF] bg-white/70 px-5 py-5 sm:px-8 lg:px-10">
+      <ul className="mx-auto grid max-w-[1440px] gap-3 text-sm text-[#6B6B6B] sm:grid-cols-2 lg:grid-cols-4">
+        {items.map((item) => {
+          const Icon = item.icon;
+          return (
+            <li key={item.label} className="flex items-center gap-2">
+              <Icon className="h-4 w-4 shrink-0 text-[#E30613]" aria-hidden="true" />
+              <span>{item.label}</span>
+            </li>
+          );
+        })}
+      </ul>
+    </footer>
+  );
+}
 
-              {/* Variants */}
-              {selectedItem.variants.length > 0 && (
-                <div className="space-y-2.5">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-logo-red/10 flex items-center justify-center">
-                      <Utensils className="w-3.5 h-3.5 text-logo-red" />
-                    </div>
-                    <label className="font-mono text-[10px] text-gray-500 uppercase tracking-[0.1em]">
-                      {isNl ? "Kies je optie" : "Choose an option"}
-                    </label>
-                    <div className="flex-1 h-px bg-border-default" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {selectedItem.variants.map((v) => {
-                      const isSelected = selectedVariant === v.id;
-                      return (
-                        <button
-                          key={v.id}
-                          onClick={() => setSelectedVariant(v.id)}
-                          className={`relative px-3 py-2.5 border rounded-lg text-[13px] font-medium transition-colors text-left ${
-                            isSelected
-                              ? "border-logo-red bg-logo-red/10 text-foreground"
-                              : "border-gray-200 text-gray-500 hover:border-border-default"
-                          }`}
-                        >
-                          <span className="flex items-center justify-between">
-                            <span>{isNl && v.nameNl ? v.nameNl : v.name}</span>
-                            {isSelected && (
-                              <span className="w-4 h-4 rounded-full bg-logo-red flex items-center justify-center shrink-0 ml-1">
-                                <Check className="w-2.5 h-2.5 text-white" />
-                              </span>
-                            )}
-                          </span>
-                          {v.price > 0 && (
-                            <span className="text-[11px] text-gray-400 block mt-0.5">+{fmtPrice(v.price)}</span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Modifiers */}
-              {selectedItem.modifiers.length > 0 && (
-                <div className="space-y-2.5">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-logo-red/10 flex items-center justify-center">
-                      <Plus className="w-3.5 h-3.5 text-logo-red" />
-                    </div>
-                    <label className="font-mono text-[10px] text-gray-500 uppercase tracking-[0.1em]">
-                      {isNl ? "Extras" : "Add-ons"}
-                    </label>
-                    <div className="flex-1 h-px bg-border-default" />
-                  </div>
-                  <div className="space-y-2">
-                    {selectedItem.modifiers.map((m) => {
-                      const checked = selectedModifiers.includes(m.id);
-                      return (
-                        <button
-                          key={m.id}
-                          onClick={() => toggleModifier(m.id)}
-                          className={`w-full flex items-center justify-between p-3 border text-left transition-colors ${
-                            checked
-                              ? "border-logo-red bg-logo-red/10"
-                              : "border-gray-200 hover:border-border-default"
-                          }`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div
-                              className={`w-5 h-5 border flex items-center justify-center transition-colors ${
-                                checked ? "bg-logo-red border-logo-red" : "border-gray-500"
-                              }`}
-                            >
-                              {checked && <Check className="w-3 h-3 text-black" />}
-                            </div>
-                            <span className="text-foreground text-[13px]">
-                              {isNl && m.nameNl ? m.nameNl : m.name}
-                            </span>
-                          </div>
-                          {m.price > 0 && (
-                            <span className="text-brand-gold text-[13px] shrink-0">+{fmtPrice(m.price)}</span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {selectedItem.exclusions.length > 0 && (
-                <div className="space-y-2.5">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-logo-gold/10 flex items-center justify-center">
-                      <Utensils className="w-3.5 h-3.5 text-brand-gold" />
-                    </div>
-                    <label className="font-mono text-[10px] text-gray-500 uppercase tracking-[0.1em]">
-                      {isNl ? "Maak je gerechtje" : "Customize your dish"}
-                    </label>
-                    <div className="flex-1 h-px bg-border-default" />
-                  </div>
-                  <p className="text-[11px] text-gray-400">
-                    {isNl ? "Vink je voorkeur aan." : "Tick your preferences."}
-                  </p>
-                  <div className="space-y-2">
-                    {selectedItem.exclusions.map((e) => {
-                      const checked = selectedExclusions.includes(e.id);
-                      return (
-                        <button
-                          key={e.id}
-                          onClick={() => toggleExclusion(e.id)}
-                          className={`w-full flex items-center gap-3 p-3 border text-left transition-colors ${
-                            checked
-                              ? "border-brand-gold bg-logo-gold/10"
-                              : "border-gray-200 hover:border-border-default"
-                          }`}
-                        >
-                          <div
-                            className={`w-5 h-5 border flex items-center justify-center transition-colors ${
-                              checked ? "bg-brand-gold border-brand-gold" : "border-gray-500"
-                            }`}
-                          >
-                            {checked && <Check className="w-3 h-3 text-white" />}
-                          </div>
-                          <span className="text-foreground text-[13px]">
-                            {isNl && e.nameNl ? e.nameNl : e.name}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Add button */}
-              <button
-                onClick={() => handleAdd(selectedItem)}
-                className="w-full py-4 bg-logo-red text-black font-bold text-[13px] tracking-[0.08em] uppercase hover:brightness-110 transition-all flex items-center justify-center gap-2"
-              >
-                <Plus className="w-5 h-5" />
-                {isNl ? "Toevoegen" : "Add to order"} &middot; {fmtPrice(getItemPrice(selectedItem) + getModifierTotal(selectedItem))}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+function MobileContinueBar({ onContinue, copy, disabled }: { onContinue: () => void; copy: OrderCopy; disabled: boolean }) {
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-50 border-t border-[#E8E4DF] bg-white/95 p-4 pb-safe shadow-[0_-12px_34px_rgba(20,20,20,0.08)] backdrop-blur-md md:hidden">
+      <button
+        type="button"
+        onClick={onContinue}
+        disabled={disabled}
+        className="inline-flex min-h-14 w-full items-center justify-center gap-3 rounded-2xl bg-[#E30613] px-5 py-4 text-base font-bold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[#E30613] disabled:cursor-wait disabled:opacity-70"
+      >
+        {copy.continueToMenu}
+        <ArrowRight className="h-5 w-5" aria-hidden="true" />
+      </button>
     </div>
   );
 }

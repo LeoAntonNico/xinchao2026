@@ -18,7 +18,48 @@ interface OrderItemInput {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { items, locationId, slot: slotId, name, phone, email, notes, customerId } = body;
+    const { items, locationSlug, slot, pickupDate, pickupTime, name, phone, email, notes, customerId } = body;
+    let locationId = body.locationId as string | undefined;
+    if (locationId) {
+      const locationExists = await prisma.location.findUnique({ where: { id: locationId }, select: { id: true } });
+      if (!locationExists) {
+        const locationBySlug = await prisma.location.findUnique({ where: { slug: locationId }, select: { id: true } });
+        locationId = locationBySlug?.id;
+      }
+    }
+    if (!locationId && locationSlug) {
+      const locationBySlug = await prisma.location.findUnique({ where: { slug: locationSlug }, select: { id: true } });
+      locationId = locationBySlug?.id;
+    }
+    let slotId = slot as string | undefined;
+    if (slotId) {
+      const slotExists = await prisma.pickupSlot.findUnique({ where: { id: slotId }, select: { id: true } });
+      if (!slotExists) slotId = undefined;
+    }
+    if (!slotId && locationId && pickupDate && pickupTime) {
+      const pickupDateValue = new Date(`${pickupDate}T00:00:00`);
+      const slotRecord = await prisma.pickupSlot.upsert({
+        where: {
+          locationId_date_time: {
+            locationId,
+            date: pickupDateValue,
+            time: pickupTime,
+          },
+        },
+        update: {},
+        create: {
+          locationId,
+          date: pickupDateValue,
+          time: pickupTime,
+          capacity: 50,
+        },
+        select: { id: true },
+      });
+      slotId = slotRecord.id;
+    }
+    if (!locationId || !slotId) {
+      return NextResponse.json({ error: "Missing location or pickup time" }, { status: 400 });
+    }
     const total = items.reduce(
       (sum: number, i: OrderItemInput) => sum + i.price * i.quantity,
       0
@@ -50,12 +91,19 @@ export async function POST(req: Request) {
       },
     });
 
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || new URL(req.url).origin;
+    const requestOrigin = new URL(req.url).origin;
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || requestOrigin;
+    const configuredWebhookUrl = process.env.MOLLIE_WEBHOOK_URL;
+    const webhookUrl =
+      configuredWebhookUrl ||
+      (baseUrl.startsWith("https://") && !baseUrl.includes("localhost") && !baseUrl.includes("127.0.0.1")
+        ? `${baseUrl}/api/webhook/mollie`
+        : undefined);
     const payment = await createPayment({
       amount: total,
       description: `Order ${order.id}`,
       redirectUrl: `${baseUrl}/en/order/confirmation?orderId=${order.id}`,
-      webhookUrl: process.env.MOLLIE_WEBHOOK_URL || `${baseUrl}/api/webhook/mollie`,
+      webhookUrl,
       metadata: { orderId: order.id },
     });
 
@@ -65,7 +113,7 @@ export async function POST(req: Request) {
     });
 
     // Fetch related info for email
-    const [location, slot] = await Promise.all([
+    const [location, pickupSlot] = await Promise.all([
       prisma.location.findUnique({ where: { id: locationId }, select: { name: true } }),
       prisma.pickupSlot.findUnique({ where: { id: slotId }, select: { date: true, time: true } }),
     ]);
@@ -75,7 +123,7 @@ export async function POST(req: Request) {
     });
     const nameMap = Object.fromEntries(itemNames.map((m) => [m.id, m.name]));
 
-    if (email && slot && location) {
+    if (email && pickupSlot && location) {
       await sendOrderPendingEmail({
         to: email,
         orderId: order.id,
@@ -83,8 +131,8 @@ export async function POST(req: Request) {
         total: total / 100,
         items: items.map((i: OrderItemInput) => ({ name: nameMap[i.menuItemId] ?? "Item", qty: i.quantity })),
         location: location.name,
-        pickupDate: new Date(slot.date).toLocaleDateString("en-GB"),
-        pickupTime: slot.time,
+        pickupDate: new Date(pickupSlot.date).toLocaleDateString("en-GB"),
+        pickupTime: pickupSlot.time,
         paymentUrl: payment.getCheckoutUrl()!,
       }).catch(console.error);
     }
@@ -93,6 +141,9 @@ export async function POST(req: Request) {
   } catch (e: unknown) {
     console.error(e);
     const message = e instanceof Error ? e.message : "Unknown error";
+    if (/authorization header|api key|mollie|payment/i.test(message)) {
+      return NextResponse.json({ error: "Payment could not be started" }, { status: 502 });
+    }
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

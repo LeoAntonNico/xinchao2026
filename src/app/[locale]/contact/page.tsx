@@ -1,10 +1,11 @@
-import { getTranslations, setRequestLocale } from "next-intl/server";
+import { setRequestLocale } from "next-intl/server";
 import { prisma } from "@/lib/prisma";
+import { previewLocations } from "@/lib/local-preview-data";
 import {
   MapPin, Phone, Mail, Clock, Calendar, ShoppingBag, Navigation,
-  Building2, Leaf
 } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 
 export default async function ContactPage({
   params,
@@ -13,10 +14,10 @@ export default async function ContactPage({
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
-  const t = await getTranslations();
   const isNl = locale === "nl";
 
-  const locations = await prisma.location.findMany({ orderBy: { createdAt: "asc" } });
+  const locations = await prisma.location.findMany({ orderBy: { createdAt: "asc" } })
+    .catch(() => previewLocations);
 
   return (
     <div className="px-6 md:px-10 py-8 max-w-4xl">
@@ -64,27 +65,23 @@ export default async function ContactPage({
           const accent = isUtrecht
             ? { iconBg: "bg-logo-red", text: "text-logo-red", border: "border-logo-red", hover: "hover:bg-logo-red/10" }
             : { iconBg: "bg-logo-gold", text: "text-logo-gold", border: "border-logo-gold", hover: "hover:bg-logo-gold/10" };
-          const district = isUtrecht
-            ? (isNl ? "Centrum" : "City Centre")
-            : (isNl ? "Universiteitsstad" : "University Town");
           const mapsUrl = `https://maps.google.com/?q=${encodeURIComponent(loc.address || "")}`;
+          const imageSrc = isUtrecht ? "/images/utrecht-exterior.jpg" : "/images/wageningen-exterior.jpg";
 
           return (
-            <div key={loc.id} className="bg-surface rounded-xl border border-outline-variant p-5">
-              {/* Icon + district */}
-              <div className="flex items-center gap-3 mb-4">
-                <div className={`w-10 h-10 rounded-full ${accent.iconBg} flex items-center justify-center shrink-0`}>
-                  {isUtrecht ? (
-                    <Building2 className="w-5 h-5 text-white" />
-                  ) : (
-                    <Leaf className="w-5 h-5 text-white" />
-                  )}
-                </div>
-                <span className={`text-[11px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full border ${accent.border} ${accent.text}`}>
-                  {district}
-                </span>
+            <div key={loc.id} className="overflow-hidden bg-surface rounded-xl border border-outline-variant">
+              <div className="relative h-36 sm:h-40">
+                <Image
+                  src={imageSrc}
+                  alt={`${loc.name} exterior`}
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 768px) 100vw, 50vw"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
               </div>
 
+              <div className="p-5">
               <h3 className="text-base font-bold text-foreground mb-3">{loc.name}</h3>
 
               {/* Info rows */}
@@ -147,6 +144,7 @@ export default async function ContactPage({
                   <ShoppingBag className="w-3 h-3" />
                   {isNl ? "Bestel" : "Order"}
                 </Link>
+              </div>
               </div>
             </div>
           );

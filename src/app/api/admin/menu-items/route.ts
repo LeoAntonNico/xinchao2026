@@ -2,15 +2,34 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { prisma } from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
+import { previewLocations, previewMenuCategories } from "@/lib/local-preview-data";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const items = await prisma.menuItem.findMany({
-    include: { categories: true, locations: true, variants: { orderBy: { sortOrder: "asc" } }, modifiers: { orderBy: { sortOrder: "asc" } }, exclusions: { orderBy: { sortOrder: "asc" } } },
-    orderBy: { sortOrder: "asc" },
-  });
-  return NextResponse.json(items);
+  try {
+    const items = await prisma.menuItem.findMany({
+      include: { categories: true, locations: true, variants: { orderBy: { sortOrder: "asc" } }, modifiers: { orderBy: { sortOrder: "asc" } }, exclusions: { orderBy: { sortOrder: "asc" } } },
+      orderBy: { sortOrder: "asc" },
+    });
+    return NextResponse.json(items);
+  } catch (error) {
+    console.warn("[admin] Using local preview menu items", error);
+    const locations = previewLocations.map(({ id, name }) => ({ id, name }));
+    const items = previewMenuCategories.flatMap((category) => {
+      const { items: categoryItems, ...categorySummary } = category;
+      return categoryItems.map((item) => ({
+        ...item,
+        categories: [categorySummary],
+        locations,
+        variants: [],
+        modifiers: [],
+        exclusions: [],
+      }));
+    });
+
+    return NextResponse.json(items);
+  }
 }
 
 export async function POST(request: NextRequest) {

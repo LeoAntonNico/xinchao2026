@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { previewMenuCategories } from "@/lib/local-preview-data";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -18,7 +19,7 @@ export async function GET(req: Request) {
         include: { variants: { orderBy: { sortOrder: "asc" } }, modifiers: { orderBy: { sortOrder: "asc" } }, exclusions: { orderBy: { sortOrder: "asc" } } },
       },
     },
-  });
+  }).catch(() => previewMenuCategories);
 
   const isNl = locale === "nl";
   const result = categories.map((cat) => ({
@@ -37,9 +38,9 @@ export async function GET(req: Request) {
       isSpicy: item.isSpicy,
       isAvailable: item.isAvailable,
       isDineInOnly: item.isDineInOnly,
-      variants: item.variants,
-      modifiers: item.modifiers,
-      exclusions: item.exclusions,
+      variants: "variants" in item ? item.variants : [],
+      modifiers: "modifiers" in item ? item.modifiers : [],
+      exclusions: "exclusions" in item ? item.exclusions : [],
     })),
   }));
 

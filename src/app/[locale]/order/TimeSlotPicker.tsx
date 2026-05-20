@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Calendar, ChevronDown, Moon } from "lucide-react";
 
 interface Slot {
@@ -76,6 +76,15 @@ export default function TimeSlotPicker({ slots, selectedSlot, onSelect, locale }
   const groups = useMemo(() => groupSlots(slots), [slots]);
   const dates = useMemo(() => Object.keys(groups).sort(), [groups]);
   const [expanded, setExpanded] = useState<string>(dates[0] || "");
+
+  useEffect(() => {
+    if (dates.length === 0) {
+      setExpanded("");
+      return;
+    }
+
+    setExpanded((current) => dates.includes(current) ? current : dates[0]);
+  }, [dates]);
 
   return (
     <div className="space-y-6">

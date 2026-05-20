@@ -146,7 +146,7 @@ export default function Sidebar() {
           <div className="px-6 pt-10 pb-6">
             <Link href={getHref(locale, "/")} className="block" onClick={() => setMobileOpen(false)}>
               <Image
-                src="/images/logo.jpg"
+                src="/images/logo.png"
                 alt="Xin Chào Vietnamese Street Food"
                 width={200}
                 height={80}

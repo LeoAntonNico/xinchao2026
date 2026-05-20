@@ -4,22 +4,39 @@ import { prisma } from "@/lib/prisma";
 import { Package, CalendarCheck } from "lucide-react";
 import { requireAdminAuth } from "@/lib/require-admin";
 
+async function getDashboardCounts() {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const [orderCount, reservationCount, menuItemCount, locationCount, todayOrders, todayReservations] =
+      await Promise.all([
+        prisma.order.count(),
+        prisma.reservation.count(),
+        prisma.menuItem.count(),
+        prisma.location.count(),
+        prisma.order.count({ where: { createdAt: { gte: today } } }),
+        prisma.reservation.count({ where: { date: today } }),
+      ]);
+
+    return { orderCount, reservationCount, menuItemCount, locationCount, todayOrders, todayReservations };
+  } catch (error) {
+    console.warn("[admin] Using local fallback dashboard counts", error);
+    return {
+      orderCount: 0,
+      reservationCount: 0,
+      menuItemCount: 0,
+      locationCount: 0,
+      todayOrders: 0,
+      todayReservations: 0,
+    };
+  }
+}
+
 export default async function AdminPage() {
   await requireAdminAuth();
 
-  const orderCount = await prisma.order.count();
-  const reservationCount = await prisma.reservation.count();
-  const menuItemCount = await prisma.menuItem.count();
-  const locationCount = await prisma.location.count();
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const todayOrders = await prisma.order.count({
-    where: { createdAt: { gte: today } },
-  });
-  const todayReservations = await prisma.reservation.count({
-    where: { date: today },
-  });
+  const { orderCount, reservationCount, todayOrders, todayReservations } = await getDashboardCounts();
 
   const cards = [
     { label: "Today's Orders", value: todayOrders, icon: Package, href: "/admin/orders", color: "text-brand-red" },

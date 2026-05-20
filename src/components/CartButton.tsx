@@ -2,25 +2,32 @@
 
 import { ShoppingBag } from "lucide-react";
 import { useCart } from "./CartContext";
+import { usePathname } from "next/navigation";
+import { useLocale } from "next-intl";
 
 export default function CartButton() {
-  const { items, setIsOpen } = useCart();
+  const { items, isOpen, setIsOpen } = useCart();
+  const pathname = usePathname();
+  const locale = useLocale();
+  const isNl = locale === "nl";
   const count = items.reduce((s, i) => s + i.quantity, 0);
-  if (items.length === 0) return null;
+  if (pathname.includes("/admin") || pathname.includes("/checkout") || isOpen || count === 0) return null;
 
   return (
     <button
+      type="button"
       onClick={() => setIsOpen(true)}
-      className="hidden lg:flex fixed bottom-6 right-6 z-50 p-3 bg-sidebar border border-border-default rounded-full text-foreground hover:bg-surface-container transition-colors shadow-lg"
-      aria-label="Open cart"
+      className={[
+        "fixed right-5 z-[180] flex h-14 w-14 items-center justify-center rounded-full bg-brand-red text-white shadow-[0_14px_34px_rgba(227,6,19,0.35)] transition hover:bg-logo-red-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-red lg:bottom-6 lg:right-6",
+        pathname.includes("/menu") ? "bottom-24 lg:bottom-6" : "bottom-5",
+      ].join(" ")}
+      aria-label={isNl ? `Open winkelwagen, ${count} items` : `Open cart, ${count} items`}
     >
       <div className="relative">
-        <ShoppingBag className="w-5 h-5" />
-        {count > 0 && (
-          <span className="absolute -top-2 -right-2 w-5 h-5 bg-brand-red text-white text-xs font-bold rounded-full flex items-center justify-center">
-            {count}
-          </span>
-        )}
+        <ShoppingBag className="h-6 w-6" aria-hidden="true" />
+        <span className="absolute -right-3 -top-3 flex h-6 min-w-6 items-center justify-center rounded-full border-2 border-white bg-[#141414] px-1 text-[11px] font-extrabold leading-none text-white">
+          {count}
+        </span>
       </div>
     </button>
   );

@@ -27,7 +27,7 @@ export async function POST(req: Request) {
     const order = await prisma.order.findFirst({
       where: { molliePaymentId: paymentId },
       include: {
-        location: { select: { name: true } },
+        location: { select: { name: true, slug: true } },
         pickupSlot: { select: { date: true, time: true } },
         items: {
           include: {
@@ -69,7 +69,7 @@ export async function POST(req: Request) {
         const res = await fetch(`${baseUrl}/api/print-queue`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ orderId: order.id, location: order.location?.name?.toLowerCase() || "utrecht" }),
+          body: JSON.stringify({ orderId: order.id, location: order.location?.slug || "utrecht" }),
         });
         const result = await res.json().catch(() => null);
         console.log("[Mollie Webhook] Print queued:", result?.jobId || result?.error || res.status);

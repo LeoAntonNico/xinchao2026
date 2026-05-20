@@ -1,6 +1,7 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { prisma } from "@/lib/prisma";
 import LocationSelectorClient from "@/components/home/LocationSelectorClient";
+import { previewLocations } from "@/lib/local-preview-data";
 
 export default async function HomePage({
   params,
@@ -12,7 +13,8 @@ export default async function HomePage({
   const t = await getTranslations();
   const isNl = locale === "nl";
 
-  const locations = await prisma.location.findMany({ orderBy: { createdAt: "asc" } });
+  const locations = await prisma.location.findMany({ orderBy: { createdAt: "asc" } })
+    .catch(() => previewLocations);
 
   const accentConfigs = [
     {

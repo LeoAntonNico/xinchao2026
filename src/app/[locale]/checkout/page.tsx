@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useCart } from "@/components/CartContext";
 import { useLocale } from "next-intl";
+import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -16,10 +17,39 @@ import {
   EyeOff,
   Pencil,
   CheckCircle,
+  Minus,
+  Plus,
+  Trash2,
+  ChevronDown,
+  MapPin,
+  Clock3,
+  AlertCircle,
 } from "lucide-react";
+import { formatCartChoices } from "@/lib/cart-display";
 
 function fmtPrice(cents: number) {
   return `€${(cents / 100).toFixed(2).replace(".", ",")}`;
+}
+
+function cartLineKey(item: {
+  cartItemKey?: string;
+  menuItemId: string;
+  variantId?: string;
+  modifierIds?: string[];
+  exclusionIds?: string[];
+}) {
+  if (item.cartItemKey) return item.cartItemKey;
+  const modifiers = [...(item.modifierIds || [])].sort().join(",");
+  const exclusions = [...(item.exclusionIds || [])].sort().join(",");
+  return `${item.menuItemId}:${item.variantId || ""}:${modifiers}:${exclusions}`;
+}
+
+function getTodayInputValue() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 interface Customer {
@@ -29,10 +59,43 @@ interface Customer {
   phone: string;
 }
 
+type SummaryItem = {
+  cartItemKey?: string;
+  menuItemId: string;
+  name: string;
+  price: number;
+  quantity: number;
+  imageUrl?: string;
+  variantId?: string;
+  variantName?: string;
+  modifierIds?: string[];
+  modifierNames?: string[];
+  exclusionIds?: string[];
+  exclusionNames?: string[];
+};
+
+type CheckoutLocation = {
+  id: string;
+  slug?: string;
+  name?: string;
+  openTime?: string;
+  closeTime?: string;
+};
+
+function resolveLocationId(locations: CheckoutLocation[], storedLocationId: string, storedLocationSlug: string, storedLocationName: string) {
+  const selectedLocation =
+    locations.find((location) => location.id === storedLocationId) ??
+    locations.find((location) => location.slug === storedLocationId || location.slug === storedLocationSlug) ??
+    locations.find((location) => location.name === storedLocationName) ??
+    locations[0];
+
+  return selectedLocation;
+}
+
 export default function CheckoutPage() {
   const locale = useLocale();
   const isNl = locale === "nl";
-  const { items, total, clearCart } = useCart();
+  const { items, total, clearCart, decreaseItem, removeItem, updateQuantity } = useCart();
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -42,9 +105,16 @@ export default function CheckoutPage() {
   const [saveDetails, setSaveDetails] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [summaryEditing, setSummaryEditing] = useState(false);
+  const [mobileSummaryOpen, setMobileSummaryOpen] = useState(false);
+  const [locationId, setLocationId] = useState("");
+  const [slotId, setSlotId] = useState("");
+  const [pickupDate, setPickupDate] = useState("");
+  const [pickupTime, setPickupTime] = useState("");
+  const [locationName, setLocationName] = useState("");
+  const [locationStatusMessage, setLocationStatusMessage] = useState("");
 
   const [customer, setCustomer] = useState<Customer | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
 
   const [signInOpen, setSignInOpen] = useState(false);
@@ -52,12 +122,56 @@ export default function CheckoutPage() {
   const [signInPassword, setSignInPassword] = useState("");
   const [signInError, setSignInError] = useState("");
   const [signInLoading, setSignInLoading] = useState(false);
-
-  const locationId = typeof window !== "undefined" ? sessionStorage.getItem("order_locationId") || "" : "";
-  const slotId = typeof window !== "undefined" ? sessionStorage.getItem("order_slotId") || "" : "";
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const phoneInputRef = useRef<HTMLInputElement>(null);
+  const errorRef = useRef<HTMLParagraphElement>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    queueMicrotask(() => {
+      const rawPickupDate = sessionStorage.getItem("order_pickupDate");
+      const rawPickupTime = sessionStorage.getItem("order_pickupTime");
+      const storedLocationId = sessionStorage.getItem("order_locationId") || "";
+      const storedLocationSlug = sessionStorage.getItem("order_locationSlug") || "";
+      const storedSlotId = sessionStorage.getItem("order_slotId") || "";
+      const storedPickupDate = rawPickupDate || getTodayInputValue();
+      const storedPickupTime = rawPickupTime || "18:15";
+      const storedLocationName = sessionStorage.getItem("order_locationName") || "";
+
+      setLocationId(storedLocationId);
+      setSlotId(storedSlotId);
+      setPickupDate(storedPickupDate);
+      setPickupTime(storedPickupTime);
+      setLocationName(storedLocationName);
+
+      if (!rawPickupDate) sessionStorage.setItem("order_pickupDate", storedPickupDate);
+      if (!rawPickupTime) sessionStorage.setItem("order_pickupTime", storedPickupTime);
+      fetch("/api/locations")
+        .then((response) => response.ok ? response.json() : [])
+        .then((locations: CheckoutLocation[]) => {
+          const selectedLocation = resolveLocationId(locations, storedLocationId, storedLocationSlug, storedLocationName);
+          if (!selectedLocation?.id) return;
+          sessionStorage.setItem("order_locationId", selectedLocation.id);
+          if (selectedLocation.slug) sessionStorage.setItem("order_locationSlug", selectedLocation.slug);
+          if (selectedLocation.name) sessionStorage.setItem("order_locationName", selectedLocation.name);
+          setLocationId(selectedLocation.id);
+          setLocationName(selectedLocation.name || "");
+          if (
+            (selectedLocation.openTime && storedPickupTime < selectedLocation.openTime) ||
+            (selectedLocation.closeTime && storedPickupTime > selectedLocation.closeTime)
+          ) {
+            setLocationStatusMessage(
+              isNl
+                ? "Deze afhaaltijd lijkt buiten de openingstijd te vallen. Kies een andere tijd als bestellen niet lukt."
+                : "This pickup time appears to be outside opening hours. Choose another time if ordering is unavailable."
+            );
+          } else {
+            setLocationStatusMessage("");
+          }
+        })
+        .catch(() => {});
+    });
+
     const token = localStorage.getItem("xinchao_token");
     if (token) {
       fetch("/api/customer/me", { headers: { Authorization: `Bearer ${token}` } })
@@ -71,37 +185,95 @@ export default function CheckoutPage() {
           }
         })
         .catch(() => {})
-        .finally(() => setAuthLoading(false));
+        .finally(() => {});
     } else {
-      setAuthLoading(false);
-      const saved = localStorage.getItem("xinchao_customer");
-      if (saved) {
-        try {
-          const data = JSON.parse(saved);
-          if (data.name) setName(data.name);
-          if (data.phone) setPhone(data.phone);
-          if (data.email) setEmail(data.email);
-          setSaveDetails(true);
-        } catch {}
-      }
+      queueMicrotask(() => {
+        const saved = localStorage.getItem("xinchao_customer");
+        if (saved) {
+          try {
+            const data = JSON.parse(saved);
+            if (data.name) setName(data.name);
+            if (data.phone) setPhone(data.phone);
+            if (data.email) setEmail(data.email);
+            setSaveDetails(true);
+          } catch {}
+        }
+      });
     }
-  }, []);
+  }, [isNl]);
 
   const subtotal = Math.round((total * 100) / 109);
   const tax = total - subtotal;
+  const contextReady = !!locationId && !!pickupDate && !!pickupTime;
+
+  function showError(message: string, focusTarget?: "name" | "phone" | "error") {
+    setError(message);
+    requestAnimationFrame(() => {
+      if (focusTarget === "name") nameInputRef.current?.focus();
+      else if (focusTarget === "phone") phoneInputRef.current?.focus();
+      else errorRef.current?.focus();
+    });
+  }
+
+  function customerSafeOrderError(message?: string) {
+    if (!message) {
+      return isNl
+        ? "We konden je bestelling niet plaatsen. Controleer je gegevens en probeer opnieuw."
+        : "We couldn't place your order. Please check your details and try again.";
+    }
+    if (/authorization header|mollie|payment|api key|checkout url/i.test(message)) {
+      return isNl
+        ? "De betaling kan nu niet worden gestart. Controleer de betaalinstellingen en probeer opnieuw."
+        : "Payment cannot be started right now. Please check the payment settings and try again.";
+    }
+    if (/missing location|pickup time|foreign key|prisma|unknown|internal|database/i.test(message)) {
+      return isNl
+        ? "Controleer je afhaallocatie en afhaaltijd en probeer opnieuw."
+        : "Please check your pickup location and time, then try again.";
+    }
+    return message;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !phone) {
-      setError(isNl ? "Naam en telefoon zijn verplicht" : "Name and phone are required");
+    if (!name.trim()) {
+      showError(isNl ? "Vul je naam in." : "Please enter your name.", "name");
+      return;
+    }
+    if (!phone.trim()) {
+      showError(isNl ? "Vul je telefoonnummer in." : "Please enter your phone number.", "phone");
       return;
     }
     if (items.length === 0) {
-      setError(isNl ? "Je winkelwagen is leeg" : "Cart is empty");
+      showError(isNl ? "Je winkelwagen is leeg." : "Your cart is empty.", "error");
       return;
     }
-    if (!locationId || !slotId) {
-      setError(isNl ? "Selecteer eerst een locatie en afhaaltijd" : "Please select a location and pickup time first");
+
+    let checkoutLocationId = locationId;
+    let checkoutLocationSlug = typeof window !== "undefined" ? sessionStorage.getItem("order_locationSlug") || "" : "";
+    const checkoutSlotId = slotId;
+    const checkoutPickupDate = pickupDate || getTodayInputValue();
+    const checkoutPickupTime = pickupTime || "18:15";
+    const locations = await fetch("/api/locations")
+      .then((response) => response.ok ? response.json() : [])
+      .catch(() => [] as CheckoutLocation[]);
+    const selectedLocation = resolveLocationId(
+      locations,
+      checkoutLocationId,
+      checkoutLocationSlug,
+      typeof window !== "undefined" ? sessionStorage.getItem("order_locationName") || locationName : locationName
+    );
+    if (selectedLocation?.id) {
+      checkoutLocationId = selectedLocation.id;
+      checkoutLocationSlug = selectedLocation.slug || checkoutLocationSlug;
+      sessionStorage.setItem("order_locationId", selectedLocation.id);
+      if (selectedLocation.slug) sessionStorage.setItem("order_locationSlug", selectedLocation.slug);
+      if (selectedLocation.name) sessionStorage.setItem("order_locationName", selectedLocation.name);
+      setLocationId(selectedLocation.id);
+      setLocationName(selectedLocation.name || locationName);
+    }
+    if (!checkoutLocationId || (!checkoutSlotId && (!checkoutPickupDate || !checkoutPickupTime))) {
+      showError(isNl ? "Kies eerst een afhaallocatie en afhaaltijd." : "Please choose a pickup location and time first.", "error");
       return;
     }
     setLoading(true);
@@ -132,8 +304,11 @@ export default function CheckoutPage() {
             exclusionIds: i.exclusionIds,
             exclusionNames: i.exclusionNames,
           })),
-          locationId,
-          slot: slotId,
+          locationId: checkoutLocationId,
+          locationSlug: checkoutLocationSlug,
+          slot: checkoutSlotId,
+          pickupDate: checkoutPickupDate,
+          pickupTime: checkoutPickupTime,
           name,
           phone,
           email,
@@ -147,11 +322,11 @@ export default function CheckoutPage() {
           data.error || (isNl ? "Bestelling mislukt. Probeer opnieuw." : "Order could not be placed.")
         );
       }
-      if (!data.paymentUrl) throw new Error(isNl ? "Geen betaal-URL ontvangen" : "No payment URL returned");
+      if (!data.paymentUrl) throw new Error(isNl ? "Bestelling mislukt. Probeer opnieuw." : "Order could not be placed.");
       clearCart();
       window.location.href = data.paymentUrl;
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Payment failed");
+      showError(customerSafeOrderError(err instanceof Error ? err.message : undefined), "error");
     } finally {
       setLoading(false);
     }
@@ -216,7 +391,7 @@ export default function CheckoutPage() {
   const fieldsDisabled = isSignedIn && !editMode;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-32 lg:pb-0">
       <div className="max-w-6xl mx-auto px-6 md:px-10 py-8">
 
         <Link href={`/${locale}/order`} className="inline-flex items-center gap-2 text-brand-red text-sm font-medium hover:text-logo-red-hover transition-colors mb-6">
@@ -232,6 +407,37 @@ export default function CheckoutPage() {
           <p className="text-on-surface-variant text-sm mt-2">
             {isNl ? "Bijna klaar! Controleer je gegevens en rond je bestelling af." : "Almost there! Please review your details and complete your order."}
           </p>
+          {error && (
+            <p ref={errorRef} tabIndex={-1} role="alert" className="sr-only focus:not-sr-only focus:mt-3 focus:block focus:text-sm focus:text-brand-red">
+              {error}
+            </p>
+          )}
+        </div>
+
+        <div className="mb-8 lg:hidden">
+          <OrderSummaryCard
+            items={items}
+            total={total}
+            subtotal={subtotal}
+            tax={tax}
+            isNl={isNl}
+            locale={locale}
+            compact
+            expanded={mobileSummaryOpen}
+            onExpandedChange={setMobileSummaryOpen}
+            summaryEditing={summaryEditing}
+            onEditingChange={setSummaryEditing}
+            decreaseItem={decreaseItem}
+            removeItem={removeItem}
+            updateQuantity={updateQuantity}
+            loading={loading}
+            error={error}
+            locationName={locationName}
+            pickupDate={pickupDate}
+            pickupTime={pickupTime}
+            contextReady={contextReady}
+            locationStatusMessage={locationStatusMessage}
+          />
         </div>
 
         {isSignedIn ? (
@@ -310,7 +516,7 @@ export default function CheckoutPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-xs text-on-surface-variant uppercase tracking-wider font-medium">{isNl ? "Volledige naam" : "Full Name"}</label>
-                    <input required value={name} onChange={(e) => setName(e.target.value)} disabled={fieldsDisabled} placeholder={isNl ? "Je naam" : "Your name"} className="w-full px-4 py-3 bg-surface-container border border-default text-foreground text-sm placeholder:text-stone-gray focus:border-brand-red focus:outline-none transition-colors rounded-xl disabled:bg-[#F0EDE6] disabled:text-[#737373]" />
+                    <input ref={nameInputRef} required value={name} onChange={(e) => setName(e.target.value)} disabled={fieldsDisabled} placeholder={isNl ? "Je naam" : "Your name"} aria-invalid={!!error && !name.trim()} className="w-full px-4 py-3 bg-surface-container border border-default text-foreground text-sm placeholder:text-stone-gray focus:border-brand-red focus:outline-none transition-colors rounded-xl disabled:bg-[#F0EDE6] disabled:text-[#737373]" />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-xs text-on-surface-variant uppercase tracking-wider font-medium">{isNl ? "E-mailadres" : "Email Address"}</label>
@@ -326,7 +532,7 @@ export default function CheckoutPage() {
                       <span className="text-xs text-[#737373]">+31</span>
                       <svg className="w-3 h-3 text-[#737373]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9" /></svg>
                     </div>
-                    <input required value={phone} onChange={(e) => setPhone(e.target.value)} disabled={fieldsDisabled} placeholder={isNl ? "Je telefoonnummer" : "Your phone number"} className="flex-1 min-w-0 px-4 py-3 bg-surface-container border border-default text-foreground text-sm placeholder:text-stone-gray focus:border-brand-red focus:outline-none transition-colors rounded-r-xl disabled:bg-[#F0EDE6] disabled:text-[#737373]" />
+                    <input ref={phoneInputRef} required value={phone} onChange={(e) => setPhone(e.target.value)} disabled={fieldsDisabled} placeholder={isNl ? "Je telefoonnummer" : "Your phone number"} aria-invalid={!!error && !phone.trim()} className="flex-1 min-w-0 px-4 py-3 bg-surface-container border border-default text-foreground text-sm placeholder:text-stone-gray focus:border-brand-red focus:outline-none transition-colors rounded-r-xl disabled:bg-[#F0EDE6] disabled:text-[#737373]" />
                   </div>
                 </div>
 
@@ -408,37 +614,91 @@ export default function CheckoutPage() {
 
           </div>
 
-          <div className="w-full lg:w-[380px] shrink-0">
+          <div className="hidden w-full shrink-0 lg:block lg:w-[380px]">
             <div className="border border-default rounded-xl bg-white p-6">
-              <div className="flex items-center gap-3 mb-5">
+              <div className="mb-5 flex items-center gap-3">
                 <div className="w-8 h-8 bg-logo-red-soft rounded-full flex items-center justify-center">
                   <CreditCard className="w-4 h-4 text-brand-red" />
                 </div>
                 <h2 className="font-display text-base uppercase text-foreground tracking-tight">{isNl ? "Besteloverzicht" : "Order Summary"}</h2>
+                <button
+                  type="button"
+                  onClick={() => setSummaryEditing((editing) => !editing)}
+                  className="ml-auto text-xs font-bold uppercase tracking-wider text-brand-red underline-offset-4 transition-colors hover:text-logo-red-hover hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-red"
+                >
+                  {summaryEditing ? (isNl ? "Klaar" : "Done") : (isNl ? "Bewerk" : "Edit")}
+                </button>
               </div>
 
               <div className="space-y-4 mb-5">
-                {items.map((item) => (
-                  <div key={item.menuItemId} className="flex justify-between items-start gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-sm text-[#737373] shrink-0">{item.quantity}x</span>
-                        <span className="text-sm font-bold text-foreground uppercase">{item.name}</span>
+                {items.map((item) => {
+                  const lineKey = cartLineKey(item);
+                  const choices = formatCartChoices(item);
+                  const imageSrc = item.imageUrl || "/images/hero-pho.jpg";
+
+                  return (
+                    <div key={lineKey} className="flex justify-between items-start gap-3">
+                      <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-[#EFEAE3]">
+                        <Image src={imageSrc} alt="" fill className="object-cover" sizes="48px" />
                       </div>
-                      {item.variantName && <p className="text-[11px] text-[#B99516] uppercase tracking-wide mt-0.5">{item.variantName}</p>}
-                      {item.modifierNames && item.modifierNames.length > 0 && <p className="text-[11px] text-[#737373] uppercase tracking-wide mt-0.5">{item.modifierNames.join(" + ")}</p>}
-                      {item.exclusionNames && item.exclusionNames.length > 0 && (
-                        <p className="text-[11px] text-[#E31B23]/70 uppercase tracking-wide mt-0.5">
-                          {item.exclusionNames.map((e: string) => {
-                            const label = e.trim().toUpperCase().startsWith("NO ") ? e.trim().substring(3) : e;
-                            return `NO ${label}`;
-                          }).join(", ")}
-                        </p>
-                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-sm text-[#737373] shrink-0">{item.quantity}x</span>
+                          <span className="text-sm font-bold text-foreground uppercase">{item.name}</span>
+                        </div>
+                        {choices && <p className="text-[11px] text-[#737373] uppercase tracking-wide mt-0.5">{choices}</p>}
+                        {summaryEditing && (
+                          <div className="mt-3 flex items-center gap-2">
+                            <div className="inline-flex h-10 items-center rounded-lg border border-default bg-white">
+                              <button
+                                type="button"
+                                onClick={() => decreaseItem(lineKey)}
+                                className="flex h-10 w-10 items-center justify-center text-[#737373] transition hover:text-brand-red focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red"
+                                aria-label={isNl ? `${item.name} aantal verlagen` : `Decrease ${item.name} quantity`}
+                              >
+                                <Minus className="h-4 w-4" aria-hidden="true" />
+                              </button>
+                              <input
+                                type="number"
+                                min="1"
+                                value={item.quantity}
+                                onChange={(event) => {
+                                  const nextQuantity = Number(event.target.value);
+                                  if (Number.isFinite(nextQuantity)) updateQuantity(lineKey, nextQuantity);
+                                }}
+                                className="h-10 w-11 border-x border-default text-center text-sm font-bold text-foreground [appearance:textfield] focus:outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                aria-label={isNl ? `${item.name} aantal` : `${item.name} quantity`}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => updateQuantity(lineKey, item.quantity + 1)}
+                                className="flex h-10 w-10 items-center justify-center text-[#737373] transition hover:text-brand-red focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red"
+                                aria-label={isNl ? `${item.name} aantal verhogen` : `Increase ${item.name} quantity`}
+                              >
+                                <Plus className="h-4 w-4" aria-hidden="true" />
+                              </button>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeItem(lineKey)}
+                              className="flex h-10 w-10 items-center justify-center rounded-lg border border-[#F0C7CA] text-brand-red transition hover:bg-[#FFF4F4] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red"
+                              aria-label={isNl ? `${item.name} verwijderen` : `Remove ${item.name}`}
+                            >
+                              <Trash2 className="h-4 w-4" aria-hidden="true" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      <span className="text-sm font-bold text-foreground shrink-0">{fmtPrice(item.price * item.quantity)}</span>
                     </div>
-                    <span className="text-sm font-bold text-foreground shrink-0">{fmtPrice(item.price * item.quantity)}</span>
-                  </div>
-                ))}
+                  );
+                })}
+                <Link
+                  href={`/${locale}/menu`}
+                  className="inline-flex text-xs font-bold uppercase tracking-wider text-brand-red underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-red"
+                >
+                  {isNl ? "Meer items toevoegen" : "Add more items"}
+                </Link>
               </div>
 
               <div className="border-t border-default pt-4 space-y-2">
@@ -478,6 +738,242 @@ export default function CheckoutPage() {
 
         </div>
       </div>
+      <div className="fixed inset-x-0 bottom-0 z-50 border-t border-[#E8E4DF] bg-white/95 px-4 py-3 shadow-[0_-12px_34px_rgba(20,20,20,0.10)] backdrop-blur lg:hidden">
+        <div className="mx-auto flex max-w-6xl items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-[#737373]">{isNl ? "Totaal" : "Total"}</p>
+            <p className="text-lg font-extrabold text-brand-red">{fmtPrice(total)}</p>
+          </div>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={loading}
+            className="inline-flex min-h-12 min-w-[170px] items-center justify-center rounded-xl bg-brand-red px-5 py-3 text-sm font-extrabold uppercase tracking-wider text-white transition hover:bg-logo-red-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red disabled:cursor-wait disabled:opacity-60"
+          >
+            {loading ? (isNl ? "Bezig..." : "Placing...") : (isNl ? "Bestel" : "Place order")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function OrderSummaryCard({
+  items,
+  total,
+  subtotal,
+  tax,
+  isNl,
+  locale,
+  compact,
+  expanded,
+  onExpandedChange,
+  summaryEditing,
+  onEditingChange,
+  decreaseItem,
+  removeItem,
+  updateQuantity,
+  loading,
+  error,
+  locationName,
+  pickupDate,
+  pickupTime,
+  contextReady,
+  locationStatusMessage,
+}: {
+  items: SummaryItem[];
+  total: number;
+  subtotal: number;
+  tax: number;
+  isNl: boolean;
+  locale: string;
+  compact: boolean;
+  expanded: boolean;
+  onExpandedChange: (expanded: boolean) => void;
+  summaryEditing: boolean;
+  onEditingChange: (editing: boolean) => void;
+  decreaseItem: (id: string) => void;
+  removeItem: (id: string) => void;
+  updateQuantity: (id: string, quantity: number) => void;
+  loading: boolean;
+  error: string;
+  locationName: string;
+  pickupDate: string;
+  pickupTime: string;
+  contextReady: boolean;
+  locationStatusMessage: string;
+}) {
+  const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
+  const visibleItems = compact && !expanded ? items.slice(0, 2) : items;
+  const pickupLabel = pickupDate && pickupTime ? `${pickupDate} · ${pickupTime}` : (isNl ? "Nog niet gekozen" : "Not selected yet");
+
+  return (
+    <div className="rounded-xl border border-default bg-white p-5 shadow-[0_12px_34px_rgba(20,20,20,0.04)]">
+      <div className="mb-4 flex items-center gap-3">
+        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-logo-red-soft">
+          <CreditCard className="h-4 w-4 text-brand-red" aria-hidden="true" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h2 className="font-display text-base uppercase tracking-tight text-foreground">
+            {isNl ? "Besteloverzicht" : "Order Summary"}
+          </h2>
+          <p className="mt-0.5 text-xs text-[#737373]">
+            {itemCount} {itemCount === 1 ? "item" : "items"} · iDEAL · {fmtPrice(total)}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => onExpandedChange(!expanded)}
+          className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-default text-[#737373] transition hover:border-brand-red hover:text-brand-red focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red"
+          aria-expanded={expanded}
+          aria-controls="mobile-order-summary-details"
+          aria-label={expanded ? (isNl ? "Verberg besteloverzicht" : "Collapse order summary") : (isNl ? "Toon besteloverzicht" : "Expand order summary")}
+        >
+          <ChevronDown className={`h-5 w-5 transition-transform ${expanded ? "rotate-180" : ""}`} aria-hidden="true" />
+        </button>
+      </div>
+
+      <div className="mb-4 grid gap-2 rounded-xl bg-[#FAF9F7] p-3 text-xs text-[#6B6B6B]">
+        <p className="flex items-center gap-2">
+          <MapPin className="h-4 w-4 shrink-0 text-brand-red" aria-hidden="true" />
+          <span>{locationName || (isNl ? "Afhaallocatie wordt geladen" : "Pickup location loading")}</span>
+        </p>
+        <p className="flex items-center gap-2">
+          <Clock3 className="h-4 w-4 shrink-0 text-brand-red" aria-hidden="true" />
+          <span>{pickupLabel}</span>
+        </p>
+      </div>
+
+      {!contextReady && (
+        <div className="mb-4 flex items-start gap-2 rounded-xl border border-[#F0C7CA] bg-[#FFF4F4] p-3 text-sm text-brand-red">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <div>
+            <p className="font-bold">{isNl ? "Afhaalgegevens ontbreken" : "Pickup details missing"}</p>
+            <Link href={`/${locale}/order`} className="mt-1 inline-flex underline underline-offset-2">
+              {isNl ? "Kies locatie en tijd" : "Choose location and time"}
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {locationStatusMessage && (
+        <div className="mb-4 flex items-start gap-2 rounded-xl border border-[#F1D8A8] bg-[#FFFAED] p-3 text-sm text-[#8B6914]">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <p>{locationStatusMessage}</p>
+        </div>
+      )}
+
+      <div id="mobile-order-summary-details" className="space-y-4">
+        {visibleItems.map((item) => {
+          const lineKey = cartLineKey(item);
+          const choices = formatCartChoices(item);
+          const imageSrc = item.imageUrl || "/images/hero-pho.jpg";
+
+          return (
+            <div key={lineKey} className="flex items-start gap-3">
+              <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-[#EFEAE3]">
+                <Image src={imageSrc} alt="" fill className="object-cover" sizes="48px" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-baseline gap-2">
+                  <span className="shrink-0 text-sm text-[#737373]">{item.quantity}x</span>
+                  <span className="truncate text-sm font-bold uppercase text-foreground">{item.name}</span>
+                </div>
+                {choices && <p className="mt-0.5 line-clamp-2 text-[11px] uppercase tracking-wide text-[#737373]">{choices}</p>}
+                {summaryEditing && (
+                  <div className="mt-3 flex items-center gap-2">
+                    <div className="inline-flex h-10 items-center rounded-lg border border-default bg-white">
+                      <button
+                        type="button"
+                        onClick={() => decreaseItem(lineKey)}
+                        className="flex h-10 w-10 items-center justify-center text-[#737373] hover:text-brand-red focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red"
+                        aria-label={isNl ? `${item.name} aantal verlagen` : `Decrease ${item.name} quantity`}
+                      >
+                        <Minus className="h-4 w-4" aria-hidden="true" />
+                      </button>
+                      <span className="w-9 text-center text-sm font-bold">{item.quantity}</span>
+                      <button
+                        type="button"
+                        onClick={() => updateQuantity(lineKey, item.quantity + 1)}
+                        className="flex h-10 w-10 items-center justify-center text-[#737373] hover:text-brand-red focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red"
+                        aria-label={isNl ? `${item.name} aantal verhogen` : `Increase ${item.name} quantity`}
+                      >
+                        <Plus className="h-4 w-4" aria-hidden="true" />
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeItem(lineKey)}
+                      className="flex h-10 w-10 items-center justify-center rounded-lg border border-[#F0C7CA] text-brand-red hover:bg-[#FFF4F4] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red"
+                      aria-label={isNl ? `${item.name} verwijderen` : `Remove ${item.name}`}
+                    >
+                      <Trash2 className="h-4 w-4" aria-hidden="true" />
+                    </button>
+                  </div>
+                )}
+              </div>
+              <span className="shrink-0 text-sm font-bold text-foreground">{fmtPrice(item.price * item.quantity)}</span>
+            </div>
+          );
+        })}
+      </div>
+
+      {compact && !expanded && items.length > visibleItems.length && (
+        <button
+          type="button"
+          onClick={() => onExpandedChange(true)}
+          className="mt-3 text-xs font-bold uppercase tracking-wider text-brand-red"
+        >
+          {isNl ? `Toon alle ${items.length} regels` : `Show all ${items.length} lines`}
+        </button>
+      )}
+
+      <div className="mt-4 flex items-center justify-between border-t border-default pt-4">
+        <button
+          type="button"
+          onClick={() => onEditingChange(!summaryEditing)}
+          className="text-xs font-bold uppercase tracking-wider text-brand-red underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-red"
+        >
+          {summaryEditing ? (isNl ? "Klaar" : "Done") : (isNl ? "Bewerk" : "Edit")}
+        </button>
+        <Link
+          href={`/${locale}/menu`}
+          className="text-xs font-bold uppercase tracking-wider text-brand-red underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-red"
+        >
+          {isNl ? "Meer items" : "Add more"}
+        </Link>
+      </div>
+
+      {expanded && (
+        <div className="mt-4 space-y-2 border-t border-default pt-4">
+          <div className="flex justify-between text-sm">
+            <span className="text-on-surface-variant">{isNl ? "Subtotaal" : "Subtotal"}</span>
+            <span className="font-medium text-foreground">{fmtPrice(subtotal)}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-on-surface-variant">{isNl ? "BTW (9%)" : "Tax (9%)"}</span>
+            <span className="font-medium text-foreground">{fmtPrice(tax)}</span>
+          </div>
+          <div className="flex justify-between border-t border-default pt-3">
+            <span className="text-sm font-bold uppercase text-foreground">{isNl ? "Totaal" : "Total"}</span>
+            <span className="text-xl font-bold text-brand-red">{fmtPrice(total)}</span>
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <p role="alert" className="mt-4 text-sm text-brand-red">
+          {error}
+        </p>
+      )}
+
+      <div className="mt-4 flex items-start gap-2 text-[11px] text-[#737373]">
+        <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+        {isNl ? "Jouw betaling is veilig en versleuteld." : "Your payment is secure and encrypted."}
+      </div>
+      <span className="sr-only" aria-live="polite">
+        {loading ? (isNl ? "Bestelling wordt geplaatst" : "Placing order") : ""}
+      </span>
     </div>
   );
 }
