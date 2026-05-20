@@ -1,0 +1,10 @@
+.git
+.next
+node_modules
+npm-debug.log*
+*.tar
+*.tar.gz
+backups
+push-worktree
+.codex-ssh
+dev-server.*.log
