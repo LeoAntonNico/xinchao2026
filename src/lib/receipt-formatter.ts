@@ -1,10 +1,6 @@
 /**
- * Receipt formatter for Epson TM-T20III ESC/POS printing
- * Matches the invoice template from the user's reference image
- *
- * Paper: 80mm thermal
- * Columns: 56 (Font B / condensed mode) — use 48 for safety margin
- * Codepage: 858 (Euro symbol support)
+ * Receipt formatter for Epson TM-T20III ESC/POS printing.
+ * Paper: 80mm thermal, using Font B at 48 safe columns.
  */
 
 export interface ReceiptItem {
@@ -36,234 +32,210 @@ export interface ReceiptData {
   total: number; // cents
 }
 
-// --- ESC/POS constants ---
 const ESC = 0x1b;
 const GS = 0x1d;
 const LF = 0x0a;
-const HT = 0x09;
+const COLUMNS = 48;
 
 function bytes(...vals: number[]): Buffer {
   return Buffer.from(vals);
 }
 
 function txt(str: string): Buffer {
-  // Map common chars for codepage 858 compatibility
   const map: Record<string, string> = {
-    '€': '\xD5',
-    'ë': '\x89',
-    'ï': '\x8B',
-    'ö': '\x94',
-    'ü': '\x81',
-    'á': '\xA0',
-    'é': '\x82',
-    'í': '\xA1',
-    'ó': '\xA2',
-    'ú': '\xA3',
-    'ñ': '\xA4',
-    'ç': '\x87',
+    "€": "\xD5",
+    "ë": "\x89",
+    "ï": "\x8B",
+    "ö": "\x94",
+    "ü": "\x81",
+    "á": "\xA0",
+    "é": "\x82",
+    "í": "\xA1",
+    "ó": "\xA2",
+    "ú": "\xA3",
+    "ñ": "\xA4",
+    "ç": "\x87",
   };
+
   let out = str;
-  for (const [k, v] of Object.entries(map)) {
-    out = out.split(k).join(v);
+  for (const [from, to] of Object.entries(map)) {
+    out = out.split(from).join(to);
   }
-  return Buffer.from(out, 'latin1');
+  return Buffer.from(out, "latin1");
 }
 
-/* ── printer commands ── */
 const reset = () => bytes(ESC, 0x40);
-const cut = () => bytes(GS, 0x56, 0x01);
+const cut = () => bytes(GS, 0x56, 0x41, 0x00);
 const feed = (n = 1) => Buffer.concat(Array(n).fill(bytes(LF)));
 const bold = (on: boolean) => bytes(ESC, 0x45, on ? 1 : 0);
-const underline = (on: boolean) => bytes(ESC, 0x2D, on ? 1 : 0);
-const align = (pos: 'L' | 'C' | 'R') => bytes(ESC, 0x61, pos === 'L' ? 0 : pos === 'C' ? 1 : 2);
-const font = (type: 'A' | 'B') => bytes(ESC, 0x4D, type === 'B' ? 1 : 0);
-const dw = (on: boolean) => bytes(ESC, 0x21, on ? 0x30 : 0x00); // double-width + height
-const dhOnly = (on: boolean) => bytes(ESC, 0x21, on ? 0x20 : 0x00); // double-width only
+const align = (pos: "L" | "C" | "R") => bytes(ESC, 0x61, pos === "L" ? 0 : pos === "C" ? 1 : 2);
+const font = (type: "A" | "B") => bytes(ESC, 0x4D, type === "B" ? 1 : 0);
 const inverse = (on: boolean) => bytes(GS, 0x42, on ? 1 : 0);
+const leftMargin = () => bytes(GS, 0x4C, 0x00, 0x00);
 
-/* tab-stops (columns in Font-B are ~7 dots)
- *  stop1 = col 30  → product name area
- *  stop2 = col 37  → quantity
- *  stop3 = col 48  → price (right aligned)
- */
-const setTabs = () => bytes(ESC, 0x44, 30, 37, 48, 0);
+const fmtCents = (cents: number) => `€ ${(cents / 100).toFixed(2).replace(".", ",")}`;
+const padR = (value: string, width: number) => value.length > width ? `${value.slice(0, width - 1)}…` : value.padEnd(width);
+const padL = (value: string, width: number) => value.length > width ? value.slice(0, width) : value.padStart(width);
+const line = (char: string, width = COLUMNS) => char.repeat(width);
+const row = (left: string, middle: string, right: string) => `${padR(left, 27)}${padL(middle, 10)}${padL(right, 11)}`;
+const headerRow = (left: string, right: string) => `${padR(left, 22)}${padL(right, 26)}`;
+const totalRow = (label: string, value: string) => `${padR(label, 11)}${padL(value, 14)}`;
 
-/* ── helpers ── */
-const fmtCents = (c: number) => `EUR ${(c / 100).toFixed(2).replace('.', ',')}`;
-const padR = (s: string, w: number) => s.length > w ? s.slice(0, w - 1) + '…' : s.padEnd(w);
-const padL = (s: string, w: number) => s.padStart(w);
-const sepLine = (ch: string) => txt(ch.repeat(48));
-
-/* ── wrap text at width, returning lines ── */
-function wrapLines(str: string, width: number): string[] {
-  const words = str.split(' ');
+function wrapLines(value: string, width: number): string[] {
+  const words = value.split(" ").filter(Boolean);
   const lines: string[] = [];
-  let cur = '';
-  for (const w of words) {
-    if ((cur + ' ' + w).trim().length <= width) {
-      cur = cur ? cur + ' ' + w : w;
+  let current = "";
+
+  for (const word of words) {
+    const next = current ? `${current} ${word}` : word;
+    if (next.length <= width) {
+      current = next;
     } else {
-      if (cur) lines.push(cur);
-      cur = w;
+      if (current) lines.push(current);
+      current = word;
     }
   }
-  if (cur) lines.push(cur);
-  return lines.length ? lines : [''];
+
+  if (current) lines.push(current);
+  return lines.length ? lines : [""];
 }
 
-/* ═════════════════════════════════════════════
-   ESC/POS receipt buffer (thermal printer)
-   ═════════════════════════════════════════════ */
-export function formatReceiptEscPos(data: ReceiptData): Buffer {
-  const parts: Buffer[] = [];
-  const push = (...b: Buffer[]) => parts.push(...b);
+function writeTextLine(parts: Buffer[], value = "") {
+  parts.push(txt(value), feed());
+}
 
-  // Init
-  push(reset(), font('B'), bytes(GS, 0x4C, 0x00, 0x00)); // left margin = 0
+function writeKeyValue(parts: Buffer[], key: string, value: string) {
+  parts.push(bold(true), txt(padR(`${key}:`, 17)), bold(false), txt(value), feed());
+}
 
-  // Header
-  push(align('C'));
-  push(bold(true));
-  push(txt(data.locationName), feed());
-  push(bold(false));
-  push(txt(data.address), feed());
-  push(txt(`${data.postalCode} ${data.city}`), feed(2));
+function writeReceiptHeader(parts: Buffer[], data: ReceiptData) {
+  parts.push(align("L"));
+  parts.push(bold(true), txt(headerRow("XIN CHAO", data.locationName)), bold(false), feed());
+  writeTextLine(parts, headerRow("Vietnamese Street Food", data.address));
+  writeTextLine(parts, headerRow("", `${data.postalCode} ${data.city}`));
+  parts.push(feed());
+}
 
-  // INVOICE banner (inverse)
-  push(inverse(true), bold(true));
-  push(align('C'));
-  push(txt('  INVOICE  '));
-  push(inverse(false), bold(false));
-  push(feed(2));
+function writeReceiptItems(parts: Buffer[], data: ReceiptData) {
+  parts.push(inverse(true), bold(true), txt(row("Product", "Quantity", "Price")), bold(false), inverse(false), feed());
 
-  // ══ BILLING ══
-  push(align('L'), bold(true));
-  push(txt('Billing Address:'), feed());
-  push(bold(false));
-  push(txt(data.customerName), feed());
-  if (data.customerAddress) push(txt(data.customerAddress), feed());
-  if (data.customerPostalCode && data.customerCity) {
-    push(txt(`${data.customerPostalCode} ${data.customerCity}`), feed());
-  }
-  push(txt(data.customerPhone), feed(2));
-
-  // ══ ORDER DETAILS ══
-  const kv = (k: string, v: string) => push(txt(`${padR(k + ':', 16)} ${v}`), feed());
-  kv('Order Number', data.orderNumber);
-  kv('Order Date', data.orderDate);
-  kv('Payment', data.paymentMethod);
-  kv('Shipping', data.shippingMethod);
-  kv('Order Time', data.orderTime);
-  kv('Pickup Time', data.pickupTime);
-  push(feed());
-
-  // ══ TABLE HEADER (inverse bar) ══
-  push(inverse(true));
-  push(txt('Product                    Qty   Price'));
-  push(inverse(false), feed());
-
-  // ══ ITEMS ══
-  setTabs();
   for (const item of data.items) {
-    // Product line (bold name) — wrap if too long
-    const nameLines = wrapLines(item.name, 28);
-    push(bold(true), txt(padR(nameLines[0], 28)));
-    push(bytes(HT), txt(padL(String(item.quantity), 4)));
-    push(bytes(HT), txt(padL(fmtCents(item.price), 12)));
-    push(bold(false), feed());
-
-    // wrapped name continuations (no bold, no price)
-    for (let i = 1; i < nameLines.length; i++) {
-      push(txt(`  ${nameLines[i]}`), feed());
+    const nameLines = wrapLines(item.name, 27);
+    writeTextLine(parts, row(nameLines[0], String(item.quantity), fmtCents(item.price)));
+    for (let i = 1; i < nameLines.length; i += 1) {
+      writeTextLine(parts, `  ${nameLines[i]}`);
     }
 
-    // Modifiers indented
-    if (item.modifiers) {
-      for (const mod of item.modifiers) {
-        const line = `  ${mod.label}: ${mod.value}`;
-        const modLines = wrapLines(line, 44);
-        for (const ml of modLines) {
-          push(txt(ml), feed());
-        }
+    for (const modifier of item.modifiers || []) {
+      const modifierLines = wrapLines(`${modifier.label}: ${modifier.value}`, 44);
+      for (const modifierLine of modifierLines) {
+        writeTextLine(parts, `  ${modifierLine}`);
       }
     }
+
+    writeTextLine(parts, line("-", COLUMNS));
   }
+}
 
-  // ══ TOTALS ══
-  push(sepLine('-'), feed());
-  push(txt(`${padR('Subtotaal:', 36)}${padL(fmtCents(data.subtotal), 12)}`), feed());
-  push(txt(`${padR('Verzending:', 36)}${padL(data.shippingMethod, 12)}`), feed());
-  push(sepLine('='), feed());
+function writeReceiptTotals(parts: Buffer[], data: ReceiptData) {
+  parts.push(align("R"));
+  writeTextLine(parts, totalRow("Subtotaal", fmtCents(data.subtotal)));
+  writeTextLine(parts, totalRow("Verzending", data.shippingMethod));
+  writeTextLine(parts, line("-", 25));
+  parts.push(bold(true));
+  writeTextLine(parts, totalRow("Total", fmtCents(data.total)));
+  parts.push(bold(false));
+  writeTextLine(parts, line("=", 25));
+}
 
-  push(bold(true), dw(true));
-  push(txt(`${padR('TOTAAL:', 20)}${padL(fmtCents(data.total), 22)}`));
-  push(dw(false), bold(false), feed());
-  push(sepLine('='), feed(4));
+export function formatReceiptEscPos(data: ReceiptData): Buffer {
+  const parts: Buffer[] = [];
 
-  push(cut());
+  parts.push(reset(), font("B"), leftMargin());
+  writeReceiptHeader(parts, data);
+
+  parts.push(bold(true), txt("INVOICE"), bold(false), feed(2));
+  writeTextLine(parts, "Billing Address:");
+  writeTextLine(parts, data.customerName);
+  if (data.customerAddress) writeTextLine(parts, data.customerAddress);
+  if (data.customerPostalCode && data.customerCity) {
+    writeTextLine(parts, `${data.customerPostalCode} ${data.customerCity}`);
+  }
+  writeTextLine(parts, data.customerPhone);
+  parts.push(feed());
+
+  writeKeyValue(parts, "Order Number", data.orderNumber);
+  writeKeyValue(parts, "Order Date", data.orderDate);
+  writeKeyValue(parts, "Payment Method", data.paymentMethod);
+  writeKeyValue(parts, "Shipping Method", data.shippingMethod);
+  writeKeyValue(parts, "Order Time", data.orderTime);
+  writeKeyValue(parts, "Pickup Time", data.pickupTime);
+  parts.push(feed());
+
+  writeReceiptItems(parts, data);
+  parts.push(feed());
+  writeReceiptTotals(parts, data);
+  parts.push(feed(4), cut());
+
   return Buffer.concat(parts);
 }
 
-/* ═════════════════════════════════════════════
-   Plain-text preview (for admin UI / logs)
-   ═════════════════════════════════════════════ */
 export function formatReceiptText(data: ReceiptData): string {
-  const w = 48;
-  const c = (s: string) => s.padStart((w + s.length) / 2).padEnd(w);
-  const line = (ch: string) => ch.repeat(w);
-  const f = fmtCents;
-  const pr = (s: string, n: number) => s.length > n ? s.slice(0, n - 1) + '…' : s.padEnd(n);
-  const pl = (s: string, n: number) => s.padStart(n);
+  const lines: string[] = [];
+  const push = (value = "") => lines.push(value);
 
-  let out = '';
-  out += c(data.locationName) + '\n';
-  out += c(data.address) + '\n';
-  out += c(`${data.postalCode} ${data.city}`) + '\n\n';
-  out += c('INVOICE') + '\n\n';
-
-  out += 'Billing Address:\n';
-  out += `${data.customerName}\n`;
-  if (data.customerAddress) out += `${data.customerAddress}\n`;
-  if (data.customerPostalCode && data.customerCity)
-    out += `${data.customerPostalCode} ${data.customerCity}\n`;
-  out += `${data.customerPhone}\n\n`;
-
-  out += `Order Number:  ${data.orderNumber}\n`;
-  out += `Order Date:    ${data.orderDate}\n`;
-  out += `Payment:       ${data.paymentMethod}\n`;
-  out += `Shipping:      ${data.shippingMethod}\n`;
-  out += `Order Time:    ${data.orderTime}\n`;
-  out += `Pickup Time:   ${data.pickupTime}\n\n`;
-
-  out += pr('Product', 28) + pl('Qty', 5) + pl('Price', 14) + '\n';
-  out += line('-') + '\n';
+  push(headerRow("XIN CHAO", data.locationName));
+  push(headerRow("Vietnamese Street Food", data.address));
+  push(headerRow("", `${data.postalCode} ${data.city}`));
+  push("");
+  push("INVOICE");
+  push("");
+  push("Billing Address:");
+  push(data.customerName);
+  if (data.customerAddress) push(data.customerAddress);
+  if (data.customerPostalCode && data.customerCity) push(`${data.customerPostalCode} ${data.customerCity}`);
+  push(data.customerPhone);
+  push("");
+  push(`${padR("Order Number:", 17)}${data.orderNumber}`);
+  push(`${padR("Order Date:", 17)}${data.orderDate}`);
+  push(`${padR("Payment Method:", 17)}${data.paymentMethod}`);
+  push(`${padR("Shipping Method:", 17)}${data.shippingMethod}`);
+  push(`${padR("Order Time:", 17)}${data.orderTime}`);
+  push(`${padR("Pickup Time:", 17)}${data.pickupTime}`);
+  push("");
+  push(row("Product", "Quantity", "Price"));
 
   for (const item of data.items) {
-    const lines = wrapLines(item.name, 28);
-    out += pr(lines[0], 28) + pl(String(item.quantity), 5) + pl(f(item.price), 14) + '\n';
-    for (let i = 1; i < lines.length; i++) {
-      out += `  ${lines[i]}\n`;
-    }
-    if (item.modifiers) {
-      for (const mod of item.modifiers) {
-        const ml = wrapLines(`  ${mod.label}: ${mod.value}`, 44);
-        for (const l of ml) out += l + '\n';
+    const nameLines = wrapLines(item.name, 27);
+    push(row(nameLines[0], String(item.quantity), fmtCents(item.price)));
+    for (let i = 1; i < nameLines.length; i += 1) push(`  ${nameLines[i]}`);
+    for (const modifier of item.modifiers || []) {
+      for (const modifierLine of wrapLines(`${modifier.label}: ${modifier.value}`, 44)) {
+        push(`  ${modifierLine}`);
       }
     }
+    push(line("-"));
   }
 
-  out += line('-') + '\n';
-  out += pr('Subtotaal:', 36) + pl(f(data.subtotal), 12) + '\n';
-  out += pr('Verzending:', 36) + pl(data.shippingMethod, 12) + '\n';
-  out += line('=') + '\n';
-  out += `** TOTAAL:                      ${pl(f(data.total), 12)}\n`;
-  out += line('=') + '\n';
-  return out;
+  push(padL(totalRow("Subtotaal", fmtCents(data.subtotal)), COLUMNS));
+  push(padL(totalRow("Verzending", data.shippingMethod), COLUMNS));
+  push(padL(line("-", 25), COLUMNS));
+  push(padL(totalRow("Total", fmtCents(data.total)), COLUMNS));
+  push(padL(line("=", 25), COLUMNS));
+  return lines.join("\n");
 }
 
-/* ═════════════════════════════════════════════
-   Build ReceiptData from an Order
-   ═════════════════════════════════════════════ */
+function parseLocationAddress(address: string, fallbackName: string) {
+  const [streetPart, cityPart] = address.split(",").map((part) => part.trim());
+  const postalMatch = cityPart?.match(/^(\d{4}\s?[A-Z]{2})\s+(.+)$/i);
+
+  return {
+    street: streetPart || address,
+    postalCode: postalMatch?.[1]?.toUpperCase() || "",
+    city: postalMatch?.[2] || fallbackName.replace(/^Xin Ch[aà]o\s+/i, ""),
+  };
+}
+
 export function buildReceiptFromOrder(
   order: {
     id: string;
@@ -288,43 +260,43 @@ export function buildReceiptFromOrder(
   },
   pickupTime?: string
 ): ReceiptData {
-  const orderDate = order.createdAt.toLocaleDateString('nl-NL', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
+  const orderDate = order.createdAt.toLocaleDateString("nl-NL", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
   });
+  const parsedAddress = parseLocationAddress(location.address, location.name);
 
-  const street = location.address.split(',')[0]?.trim() || location.address;
+  const items: ReceiptItem[] = order.items.map((item) => {
+    const modifiers: { label: string; value: string }[] = [];
+    if (item.variantName) modifiers.push({ label: "Keuze", value: item.variantName });
+    if (item.modifierNames.length > 0) modifiers.push({ label: "Extras", value: item.modifierNames.join(", ") });
 
-  const items: ReceiptItem[] = order.items.map((it) => {
-    const name = it.menuItem.nameNl || it.menuItem.name;
-    const mods: { label: string; value: string }[] = [];
-    if (it.variantName) mods.push({ label: 'Keuze', value: it.variantName });
-    if (it.modifierNames.length > 0) {
-      // Try to split "Label: Value" pairs
-      const joined = it.modifierNames.join(', ');
-      mods.push({ label: 'Extras', value: joined });
-    }
-    return { name, quantity: it.quantity, price: it.price, modifiers: mods.length ? mods : undefined };
+    return {
+      name: item.menuItem.nameNl || item.menuItem.name,
+      quantity: item.quantity,
+      price: item.price,
+      modifiers: modifiers.length ? modifiers : undefined,
+    };
   });
 
   return {
     locationName: location.name,
-    address: street,
-    postalCode: '6701 BT',
-    city: location.name,
+    address: parsedAddress.street,
+    postalCode: parsedAddress.postalCode,
+    city: parsedAddress.city,
     customerName: order.customerName,
     customerPhone: order.customerPhone,
     orderNumber: order.id.slice(-5).toUpperCase(),
     orderDate,
-    paymentMethod: 'iDEAL | Wero',
-    shippingMethod: 'Lokaal afhalen',
-    orderTime: order.createdAt.toLocaleTimeString('nl-NL', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
+    paymentMethod: "iDEAL | Wero",
+    shippingMethod: "Lokaal afhalen",
+    orderTime: order.createdAt.toLocaleTimeString("nl-NL", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
     }),
-    pickupTime: pickupTime || 'ASAP',
+    pickupTime: pickupTime || "ASAP",
     items,
     subtotal: order.totalAmount,
     shipping: 0,
@@ -332,70 +304,62 @@ export function buildReceiptFromOrder(
   };
 }
 
-/* ═════════════════════════════════════════════
-   Test receipt data (for admin print-test page)
-   ═════════════════════════════════════════════ */
-export function getTestReceiptData(locationName = 'Wageningen'): ReceiptData {
+export function getTestReceiptData(locationName = "Wageningen"): ReceiptData {
   return {
-    locationName: `Xin Chao ${locationName}`,
-    address: 'Hoogstraat 18',
-    postalCode: '6701 BT',
+    locationName: `Xin Chào ${locationName}`,
+    address: "Hoogstraat 18",
+    postalCode: "6701 BT",
     city: locationName,
-    customerName: 'Peter Van Hooff',
-    customerAddress: 'Rustenburg 18',
-    customerPostalCode: '6701 DV',
+    customerName: "Julia Kerkhof",
+    customerAddress: "Hoogstraat 52",
+    customerPostalCode: "6701 BB",
     customerCity: locationName,
-    customerPhone: '0652801056',
-    orderNumber: '13927',
-    orderDate: '7 mei 2026',
-    paymentMethod: 'IDEAL | Wero',
-    shippingMethod: 'Lokaal afhalen',
-    orderTime: '16:05:14',
-    pickupTime: '17:50',
+    customerPhone: "0615180734",
+    orderNumber: "13982",
+    orderDate: "19 mei 2026",
+    paymentMethod: "iDEAL | Wero",
+    shippingMethod: "Lokaal afhalen",
+    orderTime: "16:34:08",
+    pickupTime: "17:30",
     items: [
       {
-        name: 'Viên Chiên',
+        name: "Vietnamese Fried Chicken Wings",
         quantity: 1,
-        price: 695,
-        modifiers: [{ label: 'Keuze', value: 'Vegan' }],
+        price: 895,
+        modifiers: [{ label: "Kies je favoriete saus", value: "Butter Sauce" }],
+      },
+      { name: "Cha gio", quantity: 1, price: 795 },
+      {
+        name: "Goi Cuon",
+        quantity: 2,
+        price: 1390,
+        modifiers: [{ label: "Vulling", value: "Gegrilde varkens citroengras" }],
       },
       {
-        name: 'Gỏi Cuốn',
+        name: "Banh mi",
         quantity: 1,
-        price: 695,
-        modifiers: [{ label: 'Vulling', value: 'Garnalen en ei' }],
+        price: 800,
+        modifiers: [{ label: "Hoofdbeleg", value: "Gegrilde chili kip" }],
       },
       {
-        name: 'Bún \'Xin Chao\'',
+        name: "Bun / Com",
         quantity: 1,
-        price: 1895,
+        price: 1095,
         modifiers: [
-          { label: 'Toppings (+EUR 0,50)', value: 'Gestoofde rundvlees' },
-          { label: 'Saus', value: 'Soja saus' },
-          { label: 'Extra\'s (+EUR 3,50)', value: 'Extra Topping' },
-          { label: 'Glutenallergie', value: 'Nee' },
+          { label: "Basis keuze", value: "Rijstnoedels" },
+          { label: "Toppings (+ € 0,50)", value: "Gestoofde rundvlees" },
+          { label: "Glutenallergie", value: "Ja" },
         ],
       },
       {
-        name: 'Bún \'Xin Chao\'',
-        quantity: 1,
-        price: 1845,
-        modifiers: [
-          { label: 'Toppings', value: 'Gegrilde chili kip' },
-          { label: 'Saus', value: 'Soja saus' },
-          { label: 'Extra\'s (+EUR 3,50)', value: 'Extra Topping' },
-          { label: 'Glutenallergie', value: 'Nee' },
-        ],
-      },
-      {
-        name: 'Gỏi Cuốn',
+        name: "Goi Cuon",
         quantity: 1,
         price: 695,
-        modifiers: [{ label: 'Vulling', value: 'Là Vong gebakken vis' }],
+        modifiers: [{ label: "Vulling", value: "Garnalen en ei" }],
       },
     ],
-    subtotal: 5825,
+    subtotal: 5670,
     shipping: 0,
-    total: 5825,
+    total: 5670,
   };
 }
