@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getPayment } from "@/lib/mollie";
+import { ensurePrintJobForOrder } from "@/lib/print-jobs";
 
 export async function GET(req: NextRequest) {
   const orderId = req.nextUrl.searchParams.get("orderId");
@@ -41,6 +42,12 @@ export async function GET(req: NextRequest) {
     } catch {
       // ignore mollie fetch errors
     }
+  }
+
+  if (order.status === "PAID") {
+    ensurePrintJobForOrder(order.id).catch((err) => {
+      console.error("[Order Status] Print queue failed:", err);
+    });
   }
 
   return NextResponse.json({

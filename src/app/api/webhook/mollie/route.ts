@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getPayment } from "@/lib/mollie";
 import { sendOrderPaidEmail } from "@/lib/notifications";
+import { ensurePrintJobForOrder } from "@/lib/print-jobs";
 
 export async function POST(req: Request) {
   try {
@@ -65,14 +66,8 @@ export async function POST(req: Request) {
 
       // Queue print job for the branch printer
       try {
-        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXTAUTH_URL || "http://91.98.224.2:3000";
-        const res = await fetch(`${baseUrl}/api/print-queue`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ orderId: order.id, location: order.location?.slug || "utrecht" }),
-        });
-        const result = await res.json().catch(() => null);
-        console.log("[Mollie Webhook] Print queued:", result?.jobId || result?.error || res.status);
+        const result = await ensurePrintJobForOrder(order.id);
+        console.log("[Mollie Webhook] Print queued:", result.jobId, result.status);
       } catch (err) {
         console.error("[Mollie Webhook] Print queue failed:", err);
       }
