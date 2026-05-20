@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -93,6 +93,19 @@ function formatPrice(cents: number) {
   return `€${(cents / 100).toFixed(2).replace(".", ",")}`;
 }
 
+function formatPickupDateLabel(date: string, locale: string) {
+  if (!date) return locale === "nl" ? "Nog geen dag gekozen" : "No day selected";
+
+  const parsed = new Date(`${date}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return date;
+
+  return new Intl.DateTimeFormat(locale === "nl" ? "nl-NL" : "en-GB", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  }).format(parsed);
+}
+
 function slugId(slug: string) {
   return `category-${slug.replace(/[^a-z0-9_-]/gi, "-")}`;
 }
@@ -112,8 +125,31 @@ export default function MenuOrderClient({ categories, dietaryOptions, locale }: 
   const copy = getCopy(locale);
   const [activeCategory, setActiveCategory] = useState("all");
   const [selectedProduct, setSelectedProduct] = useState<MenuItemView | null>(null);
+  const [pickupChoice, setPickupChoice] = useState({
+    locationName: "Xin Chào Utrecht",
+    pickupDate: "",
+    pickupTime: "",
+  });
   const dietaryMap = useMemo(() => new Map(dietaryOptions.map((option) => [option.slug, option.label])), [dietaryOptions]);
   const cartQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
+
+  useEffect(() => {
+    const readPickupChoice = () => {
+      setPickupChoice({
+        locationName: sessionStorage.getItem("order_locationName") || "Xin Chào Utrecht",
+        pickupDate: sessionStorage.getItem("order_pickupDate") || "",
+        pickupTime: sessionStorage.getItem("order_pickupTime") || "",
+      });
+    };
+
+    readPickupChoice();
+    window.addEventListener("storage", readPickupChoice);
+    window.addEventListener("focus", readPickupChoice);
+    return () => {
+      window.removeEventListener("storage", readPickupChoice);
+      window.removeEventListener("focus", readPickupChoice);
+    };
+  }, []);
 
   const visibleCategories = activeCategory === "all"
     ? categories
@@ -157,7 +193,7 @@ export default function MenuOrderClient({ categories, dietaryOptions, locale }: 
     <div className="min-h-screen bg-[#FAF9F7] text-[#141414]">
       <div className="grid min-h-screen lg:h-screen lg:overflow-hidden lg:grid-cols-[minmax(0,1fr)_356px]">
         <section className="min-w-0 border-r border-[#E8E4DF] lg:h-screen lg:overflow-y-auto">
-          <ChoiceBar locale={locale} />
+          <ChoiceBar locale={locale} choice={pickupChoice} />
 
           <div className="border-b border-[#E8E4DF] bg-[#F3F0EA] px-5 py-3 text-xs text-[#9A938A] sm:px-8 lg:px-6 xl:px-8">
             <p className="flex items-center gap-2">
@@ -196,11 +232,11 @@ export default function MenuOrderClient({ categories, dietaryOptions, locale }: 
             <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-[#7E7770]">
               <span className="inline-flex items-center gap-1.5">
                 <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
-                Xin Chào Utrecht
+                {pickupChoice.locationName}
               </span>
               <span className="inline-flex items-center gap-1.5">
                 <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
-                Sun, May 17 20:00
+                {[formatPickupDateLabel(pickupChoice.pickupDate, locale), pickupChoice.pickupTime].filter(Boolean).join(" ")}
               </span>
               <button type="button" className="ml-auto text-[#E30613] underline underline-offset-2">
                 {copy.change}
@@ -251,8 +287,17 @@ export default function MenuOrderClient({ categories, dietaryOptions, locale }: 
   );
 }
 
-function ChoiceBar({ locale }: { locale: string }) {
+function ChoiceBar({
+  locale,
+  choice,
+}: {
+  locale: string;
+  choice: { locationName: string; pickupDate: string; pickupTime: string };
+}) {
   const copy = getCopy(locale);
+  const dateLabel = formatPickupDateLabel(choice.pickupDate, locale);
+  const timeLabel = choice.pickupTime || (locale === "nl" ? "Geen tijd gekozen" : "No time selected");
+
   return (
     <div className="sticky top-0 z-30 border-b border-[#E8E4DF] bg-white/95 px-5 py-4 backdrop-blur sm:px-8 lg:px-6 xl:px-8">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -262,17 +307,17 @@ function ChoiceBar({ locale }: { locale: string }) {
           </span>
           <div className="min-w-0">
             <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#E30613]">{copy.yourChoice}</p>
-            <p className="truncate font-bold leading-tight">Xin Chào Utrecht</p>
+            <p className="truncate font-bold leading-tight">{choice.locationName}</p>
           </div>
           <span className="hidden h-8 w-px bg-[#E8E4DF] md:block" aria-hidden="true" />
           <div className="col-span-2 flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2 pl-14 text-sm text-[#6B6B6B] md:col-auto md:pl-0">
             <span className="inline-flex min-w-0 items-center gap-2">
               <CalendarDays className="h-4 w-4 shrink-0" aria-hidden="true" />
-              <span className="truncate">{locale === "nl" ? "Zo, 17 mei" : "Sun, May 17"}</span>
+              <span className="truncate">{dateLabel}</span>
             </span>
             <span className="inline-flex items-center gap-2">
               <Clock3 className="h-4 w-4 shrink-0" aria-hidden="true" />
-              20:00
+              {timeLabel}
             </span>
           </div>
         </div>
