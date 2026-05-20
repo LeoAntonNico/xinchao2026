@@ -28,6 +28,7 @@ if (process.argv.includes("--help") || process.argv.includes("-h")) {
 
 Usage:
   node print-agent/agent.mjs
+  node print-agent/agent.mjs --test-printer
 
 Config:
   Copy print-agent/.env.example to print-agent/.env and fill:
@@ -129,33 +130,40 @@ function printTcp(buffer) {
 
   return new Promise((resolve, reject) => {
     const socket = new net.Socket();
-    const timeout = setTimeout(() => {
+    let settled = false;
+
+    const done = (error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
       socket.destroy();
-      reject(new Error("Printer TCP timeout"));
+      if (error) reject(error);
+      else resolve();
+    };
+
+    const timeout = setTimeout(() => {
+      done(new Error("Printer TCP timeout"));
     }, 15000);
 
     socket.once("error", (error) => {
-      clearTimeout(timeout);
-      reject(error);
+      done(error);
     });
 
     socket.connect(config.port, config.host, () => {
-      socket.write(buffer, (error) => {
-        if (error) {
-          clearTimeout(timeout);
-          socket.destroy();
-          reject(error);
-          return;
-        }
-        socket.end();
-      });
-    });
-
-    socket.once("close", () => {
-      clearTimeout(timeout);
-      resolve();
+      socket.end(buffer, done);
     });
   });
+}
+
+function buildTcpTestReceipt() {
+  return Buffer.concat([
+    Buffer.from([0x1b, 0x40]),
+    Buffer.from("XIN CHAO PRINTER TEST\r\n", "latin1"),
+    Buffer.from(`Location: ${config.location}\r\n`, "latin1"),
+    Buffer.from(`Time: ${new Date().toLocaleString("nl-NL")}\r\n`, "latin1"),
+    Buffer.from("If you can read this, raw TCP printing works.\r\n\r\n\r\n\r\n", "latin1"),
+    Buffer.from([0x1d, 0x56, 0x41, 0x00]),
+  ]);
 }
 
 function printWindowsShare(buffer, jobId) {
@@ -219,6 +227,20 @@ async function processJobs() {
 }
 
 async function main() {
+  if (process.argv.includes("--test-printer")) {
+    log("Sending direct printer test", {
+      host: config.host,
+      port: config.port,
+      transport: config.transport,
+    });
+    await printJob({
+      id: "direct-test",
+      escposData: buildTcpTestReceipt().toString("base64"),
+    });
+    log("Direct printer test sent");
+    return;
+  }
+
   log("Xin Chao print agent started", {
     baseUrl: config.baseUrl,
     location: config.location,

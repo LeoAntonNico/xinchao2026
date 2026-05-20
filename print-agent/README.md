@@ -55,6 +55,14 @@ node .\agent.mjs
 
 Queue daarna in admin een testbon via `/admin/print`.
 
+Test de Epson ook rechtstreeks, zonder website of printqueue:
+
+```powershell
+node .\agent.mjs --test-printer
+```
+
+Als deze test zegt dat hij is verzonden maar er komt geen papier uit, controleer dan de Epson LAN-instellingen, papierstatus en of `XINCHAO_PRINTER_HOST` echt naar de bonprinter wijst.
+
 ## Automatisch starten na reboot
 
 Open PowerShell als Administrator:
