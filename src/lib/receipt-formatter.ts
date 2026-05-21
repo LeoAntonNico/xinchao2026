@@ -269,7 +269,7 @@ export function buildReceiptFromOrder(
 
   const items: ReceiptItem[] = order.items.map((item) => {
     const modifiers: { label: string; value: string }[] = [];
-    if (item.variantName) modifiers.push({ label: "Keuze", value: item.variantName });
+    if (item.variantName) modifiers.push({ label: "Option", value: item.variantName });
     if (item.modifierNames.length > 0) modifiers.push({ label: "Extras", value: item.modifierNames.join(", ") });
 
     return {
