@@ -140,7 +140,6 @@ function writeReceiptItems(parts: Buffer[], data: ReceiptData) {
 function writeReceiptTotals(parts: Buffer[], data: ReceiptData) {
   parts.push(align("R"));
   writeTextLine(parts, totalRow("Subtotal", fmtCents(data.subtotal)));
-  writeTextLine(parts, totalRow("Verzending", data.shippingMethod));
   writeTextLine(parts, line("-", 25));
   parts.push(bold(true));
   writeTextLine(parts, totalRow("Total", fmtCents(data.total)));
@@ -218,7 +217,6 @@ export function formatReceiptText(data: ReceiptData): string {
   }
 
   push(padL(totalRow("Subtotal", fmtCents(data.subtotal)), COLUMNS));
-  push(padL(totalRow("Verzending", data.shippingMethod), COLUMNS));
   push(padL(line("-", 25), COLUMNS));
   push(padL(totalRow("Total", fmtCents(data.total)), COLUMNS));
   push(padL(line("=", 25), COLUMNS));
