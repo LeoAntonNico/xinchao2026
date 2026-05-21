@@ -167,7 +167,7 @@ export function formatReceiptEscPos(data: ReceiptData): Buffer {
   writeKeyValue(parts, "Order Number", data.orderNumber);
   writeKeyValue(parts, "Order Date", data.orderDate);
   writeKeyValue(parts, "Payment Method", data.paymentMethod);
-  writeKeyValue(parts, "Shipping Method", data.shippingMethod);
+  writeKeyValue(parts, "Order Type", data.shippingMethod);
   writeKeyValue(parts, "Order Time", data.orderTime);
   writeKeyValue(parts, "Pickup Time", data.pickupTime);
   parts.push(feed());
@@ -199,7 +199,7 @@ export function formatReceiptText(data: ReceiptData): string {
   push(`${padR("Order Number:", 17)}${data.orderNumber}`);
   push(`${padR("Order Date:", 17)}${data.orderDate}`);
   push(`${padR("Payment Method:", 17)}${data.paymentMethod}`);
-  push(`${padR("Shipping Method:", 17)}${data.shippingMethod}`);
+  push(`${padR("Order Type:", 17)}${data.shippingMethod}`);
   push(`${padR("Order Time:", 17)}${data.orderTime}`);
   push(`${padR("Pickup Time:", 17)}${data.pickupTime}`);
   push("");
@@ -290,7 +290,7 @@ export function buildReceiptFromOrder(
     orderNumber: order.id.slice(-5).toUpperCase(),
     orderDate,
     paymentMethod: "iDEAL | Wero",
-    shippingMethod: "Lokaal afhalen",
+    shippingMethod: "Pickup",
     orderTime: order.createdAt.toLocaleTimeString("nl-NL", {
       hour: "2-digit",
       minute: "2-digit",
@@ -318,7 +318,7 @@ export function getTestReceiptData(locationName = "Wageningen"): ReceiptData {
     orderNumber: "13982",
     orderDate: "19 mei 2026",
     paymentMethod: "iDEAL | Wero",
-    shippingMethod: "Lokaal afhalen",
+    shippingMethod: "Pickup",
     orderTime: "16:34:08",
     pickupTime: "17:30",
     items: [
