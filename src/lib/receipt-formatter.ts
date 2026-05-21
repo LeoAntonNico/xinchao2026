@@ -151,7 +151,7 @@ export function formatReceiptEscPos(data: ReceiptData): Buffer {
   writeReceiptHeader(parts, data);
 
   parts.push(bold(true), txt("INVOICE"), bold(false), feed(2));
-  writeTextLine(parts, "Billing Address:");
+  writeTextLine(parts, "Customer Info:");
   writeTextLine(parts, data.customerName);
   if (data.customerAddress) writeTextLine(parts, data.customerAddress);
   if (data.customerPostalCode && data.customerCity) writeTextLine(parts, `${data.customerPostalCode} ${data.customerCity}`);
@@ -184,7 +184,7 @@ export function formatReceiptText(data: ReceiptData): string {
   push("");
   push("INVOICE");
   push("");
-  push("Billing Address:");
+  push("Customer Info:");
   push(data.customerName);
   if (data.customerAddress) push(data.customerAddress);
   if (data.customerPostalCode && data.customerCity) push(`${data.customerPostalCode} ${data.customerCity}`);
