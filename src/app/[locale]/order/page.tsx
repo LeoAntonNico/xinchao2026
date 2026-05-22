@@ -47,6 +47,7 @@ type PickupLocation = {
   name: string;
   slug: string;
   address: string;
+  openFrom: string;
   openUntil: string;
   imageSrc: string;
 };
@@ -60,22 +61,13 @@ const steps: Step[] = [
   { id: 4, label: "Checkout", status: "inactive" },
 ];
 
-const timeSlots: TimeSlot[] = [
-  { time: "17:30" },
-  { time: "17:45" },
-  { time: "18:00" },
-  { time: "18:15", recommended: true },
-  { time: "18:30" },
-  { time: "18:45" },
-  { time: "19:00" },
-];
-
 const pickupLocations: PickupLocation[] = [
   {
     id: "utrecht",
     slug: "utrecht",
     name: "Xin Chào Utrecht",
     address: "Voor Clarenburg 6, 3511 JE Utrecht",
+    openFrom: "12:00",
     openUntil: "21:30",
     imageSrc: "/images/utrecht-exterior.jpg",
   },
@@ -84,6 +76,7 @@ const pickupLocations: PickupLocation[] = [
     slug: "wageningen",
     name: "Xin Chào Wageningen",
     address: "Hoogstraat 18, 6701 BT Wageningen",
+    openFrom: "12:00",
     openUntil: "20:00",
     imageSrc: "/images/wageningen-exterior.jpg",
   },
@@ -113,7 +106,8 @@ function getOrderCopy(locale: string) {
     open: isNl ? "Open" : "Open",
     openTodayUntil: isNl ? "Vandaag open tot" : "Open today until",
     openUntil: isNl ? "Open tot" : "Open until",
-    orderBefore: isNl ? "Bestel voor 20:45 om op te halen" : "Order before 20:45 for pickup",
+    orderBefore: isNl ? "Bestel voor" : "Order before",
+    orderBeforeSuffix: isNl ? "om op te halen" : "for pickup",
     pickupDay: isNl ? "Afhaaldag" : "Pickup day",
     pickupDate: isNl ? "Selecteer afhaaldatum" : "Select pickup date",
     recommended: isNl ? "Aanbevolen" : "Recommended",
@@ -158,6 +152,43 @@ type ApiSlot = {
 
 function locationImage(slug: string) {
   return slug === "wageningen" ? "/images/wageningen-exterior.jpg" : "/images/utrecht-exterior.jpg";
+}
+
+function parseTimeToMinutes(time: string) {
+  const match = time.match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return null;
+
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+
+  return hours * 60 + minutes;
+}
+
+function formatMinutesAsTime(minutes: number) {
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
+}
+
+function buildPickupTimeSlots(location: PickupLocation): TimeSlot[] {
+  const openMinutes = parseTimeToMinutes(location.openFrom);
+  const closeMinutes = parseTimeToMinutes(location.openUntil);
+  if (openMinutes === null || closeMinutes === null || closeMinutes < openMinutes) return [];
+
+  const slots: TimeSlot[] = [];
+  for (let minutes = openMinutes; minutes <= closeMinutes; minutes += 15) {
+    const time = formatMinutesAsTime(minutes);
+    slots.push({ time, recommended: time === "18:15" });
+  }
+
+  return slots;
+}
+
+function pickupOrderCutoff(location: PickupLocation) {
+  const closeMinutes = parseTimeToMinutes(location.openUntil);
+  if (closeMinutes === null) return location.openUntil;
+  return formatMinutesAsTime(Math.max(closeMinutes - 15, 0));
 }
 
 function getPickupDay(dateValue: string, locale: string): PickupDay {
@@ -216,6 +247,7 @@ export default function OrderPickupPage() {
           name: location.name,
           slug: location.slug,
           address: location.address,
+          openFrom: location.openTime,
           openUntil: location.closeTime,
           imageSrc: locationImage(location.slug),
         }));
@@ -227,6 +259,18 @@ export default function OrderPickupPage() {
       })
       .catch(() => {});
   }, []);
+
+  const availableTimeSlots = useMemo(
+    () => buildPickupTimeSlots(selectedLocation),
+    [selectedLocation]
+  );
+
+  useEffect(() => {
+    if (availableTimeSlots.length === 0) return;
+    if (!availableTimeSlots.some((slot) => slot.time === selectedTime)) {
+      setSelectedTime(availableTimeSlots[0].time);
+    }
+  }, [availableTimeSlots, selectedTime]);
 
   async function saveSelectionAndContinue() {
     if (!selectedLocation) return;
@@ -268,8 +312,8 @@ export default function OrderPickupPage() {
               copy={copy}
               onSelectLocation={setSelectedLocationId}
             />
-            <TimeSlotSelector selectedTime={selectedTime} onSelect={setSelectedTime} copy={copy} />
-            <StatusRow selectedDay={selectedDay} copy={copy} />
+            <TimeSlotSelector slots={availableTimeSlots} selectedTime={selectedTime} onSelect={setSelectedTime} copy={copy} />
+            <StatusRow selectedDay={selectedDay} selectedLocation={selectedLocation} copy={copy} />
             <AnotherDayCard
               selectedDay={selectedDay}
               selectedDate={selectedDate}
@@ -456,10 +500,12 @@ function LocationCard({
 }
 
 function TimeSlotSelector({
+  slots,
   selectedTime,
   onSelect,
   copy,
 }: {
+  slots: TimeSlot[];
   selectedTime: string;
   onSelect: (time: string) => void;
   copy: OrderCopy;
@@ -471,7 +517,7 @@ function TimeSlotSelector({
       </h2>
       <div className="-mx-5 overflow-x-auto px-5 pb-2 sm:mx-0 sm:px-0">
         <div className="flex min-w-max items-stretch gap-3">
-          {timeSlots.map((slot) => {
+          {slots.map((slot) => {
             const selected = selectedTime === slot.time;
 
             return (
@@ -500,21 +546,15 @@ function TimeSlotSelector({
               </button>
             );
           })}
-          <button
-            type="button"
-            aria-label={copy.showLaterTimes}
-            className="flex min-h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[#E8E4DF] bg-white text-[#141414] transition hover:border-[#E30613]/45 hover:bg-[#FFF6F6] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[#E30613]"
-          >
-            <ChevronRight className="h-5 w-5" aria-hidden="true" />
-          </button>
         </div>
       </div>
     </section>
   );
 }
 
-function StatusRow({ selectedDay, copy }: { selectedDay: PickupDay; copy: OrderCopy }) {
+function StatusRow({ selectedDay, selectedLocation, copy }: { selectedDay: PickupDay; selectedLocation: PickupLocation; copy: OrderCopy }) {
   const orderCutoffLabel = selectedDay.summaryLabel === "Today" || selectedDay.summaryLabel === "Vandaag" ? copy.today : selectedDay.summaryLabel;
+  const cutoffTime = pickupOrderCutoff(selectedLocation);
 
   return (
     <div className="flex flex-col gap-3 rounded-[20px] border border-[#E8E4DF] bg-white px-5 py-4 text-sm font-medium text-[#6B6B6B] sm:flex-row sm:items-center sm:gap-5">
@@ -525,7 +565,7 @@ function StatusRow({ selectedDay, copy }: { selectedDay: PickupDay; copy: OrderC
       <div className="hidden h-5 w-px bg-[#E8E4DF] sm:block" aria-hidden="true" />
       <p className="flex items-center gap-2">
         <Clock3 className="h-4 w-4" aria-hidden="true" />
-        <span>{copy.orderBefore} {orderCutoffLabel}</span>
+        <span>{copy.orderBefore} {cutoffTime} {copy.orderBeforeSuffix} {orderCutoffLabel}</span>
       </p>
     </div>
   );

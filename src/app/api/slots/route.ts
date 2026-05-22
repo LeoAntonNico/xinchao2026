@@ -26,7 +26,7 @@ function previewTimes(locationId: string) {
   const closeMinutes = parseTime(location?.closeTime ?? "20:00");
   const times: string[] = [];
 
-  for (let minutes = openMinutes; minutes < closeMinutes; minutes += 30) {
+  for (let minutes = openMinutes; minutes <= closeMinutes; minutes += 15) {
     times.push(formatTime(minutes));
   }
 
