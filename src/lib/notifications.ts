@@ -70,6 +70,53 @@ function formatReservationEmailDate(date: string) {
   }).format(parsed).replace(/\//g, ".");
 }
 
+function formatReservationLongDate(date: string) {
+  const parsed = new Date(date);
+  if (Number.isNaN(parsed.getTime())) {
+    return date.replace(/\//g, "-");
+  }
+
+  return new Intl.DateTimeFormat("nl-NL", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "Europe/Amsterdam",
+  }).format(parsed);
+}
+
+function reservationNumber(args: {
+  reservationId?: string;
+  date: string;
+  time: string;
+  locationSlug?: string;
+}) {
+  const parsed = new Date(args.date);
+  const prefix = args.locationSlug === "utrecht" ? "XCU" : "XCW";
+  const timeCode = args.time.replace(/\D/g, "").padEnd(4, "0").slice(0, 4);
+
+  if (!Number.isNaN(parsed.getTime())) {
+    const day = String(parsed.getDate()).padStart(2, "0");
+    const month = String(parsed.getMonth() + 1).padStart(2, "0");
+    const year = String(parsed.getFullYear()).slice(-2);
+    return `${prefix}-${day}${month}${year}-${timeCode}`;
+  }
+
+  const suffix = args.reservationId?.slice(-6).toUpperCase() || timeCode;
+  return `${prefix}-${suffix}`;
+}
+
+function splitAddress(address: string) {
+  const parts = address.split(",").map((part) => part.trim()).filter(Boolean);
+  return {
+    street: parts[0] || address,
+    postalCity: parts.slice(1).join(", "),
+  };
+}
+
+function reservationLocationImage(slug?: string) {
+  return slug === "utrecht" ? "/images/utrecht-exterior.jpg" : "/images/wageningen-exterior.jpg";
+}
+
 function buildCalendarUrl(args: {
   customerName: string;
   partySize: number;
@@ -351,20 +398,44 @@ Xin Chao Vietnamese Restaurant
 
 export async function sendReservationEmail(args: {
   to: string;
+  reservationId?: string;
   customerName: string;
   partySize: number;
   date: string;
   time: string;
   location: string;
+  locationSlug?: string;
+  restaurantAddress?: string;
+  restaurantEmail?: string;
   restaurantPhone: string;
 }) {
-  const { to, customerName, partySize, date, time, location, restaurantPhone } = args;
+  const {
+    to,
+    reservationId,
+    customerName,
+    partySize,
+    date,
+    time,
+    location,
+    locationSlug,
+    restaurantAddress,
+    restaurantEmail,
+    restaurantPhone,
+  } = args;
   const baseUrl = (process.env.NEXT_PUBLIC_BASE_URL || "https://xinchao.nl").replace(/\/$/, "");
   const logoUrl = `${baseUrl}/images/logo.png`;
+  const locationImageUrl = `${baseUrl}${reservationLocationImage(locationSlug)}`;
   const displayDate = formatReservationEmailDate(date);
+  const longDate = formatReservationLongDate(date);
+  const code = reservationNumber({ reservationId, date, time, locationSlug });
+  const address = restaurantAddress || (locationSlug === "utrecht" ? "Voor Clarenburg 6, 3511 JE Utrecht" : "Hoogstraat 18, 6701 BT Wageningen");
+  const addressParts = splitAddress(address);
+  const shownEmail = restaurantEmail || "hello@xinchao.nl";
+  const shownPhone = restaurantPhone || (locationSlug === "utrecht" ? "+31 30 785 7092" : "+31 317 225 008");
   const calendarUrl = buildCalendarUrl({ customerName, partySize, date, time, location });
   const editUrl = `${baseUrl}/nl/reserve`;
-  const cancelUrl = `mailto:info@xinchaorestaurant.nl?subject=${encodeURIComponent(`Reservering annuleren - ${displayDate} ${time}`)}`;
+  const cancelUrl = `mailto:${shownEmail}?subject=${encodeURIComponent(`Reservering annuleren - ${code}`)}`;
+  const routeUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${location} ${address}`)}`;
   const body = `Hi ${customerName},
 
 Je reservering bij ${location} is bevestigd.
@@ -373,8 +444,9 @@ Datum: ${displayDate}
 Tijd: ${time}
 Gasten: ${partySize}
 Naam gast: ${customerName}
+Reserveringsnummer: ${code}
 
-Wil je iets wijzigen? Bel ons op ${restaurantPhone}.
+Wil je iets wijzigen? Bel ons op ${shownPhone}.
 
 Tot snel!
 Xin Chao Vietnamese Restaurant
@@ -386,82 +458,151 @@ Xin Chao Vietnamese Restaurant
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Je reservering is bevestigd</title>
   </head>
-  <body style="margin:0;background:#ffffff;color:#1f2937;font-family:Arial,Helvetica,sans-serif;">
+  <body style="margin:0;background:#F7F5F1;color:#1f2937;font-family:Arial,Helvetica,sans-serif;">
     <div style="display:none;max-height:0;overflow:hidden;color:transparent;">
       Je reservering bij ${escapeHtml(location)} is bevestigd.
     </div>
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#ffffff;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#F7F5F1;">
       <tr>
-        <td align="center" style="padding:42px 18px 28px;">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;">
+        <td align="center" style="padding:28px 14px;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:900px;background:#ffffff;border-radius:10px;box-shadow:0 18px 54px rgba(20,20,20,0.08);">
             <tr>
-              <td align="center" style="padding-bottom:30px;">
-                <img src="${escapeHtml(logoUrl)}" width="160" alt="Xin Chao" style="display:block;border:0;max-width:160px;height:auto;">
+              <td align="center" style="padding:28px 30px 10px;">
+                <img src="${escapeHtml(logoUrl)}" width="170" alt="Xin Chao" style="display:block;border:0;max-width:170px;height:auto;">
               </td>
             </tr>
             <tr>
-              <td align="center" style="padding-bottom:38px;">
-                <h1 style="margin:0;font-size:34px;line-height:1.18;font-weight:800;letter-spacing:-0.03em;color:#475569;">
-                  Je <span style="background:#FFE7A3;color:#111827;padding:0 6px;">reservering</span> is bevestigd
+              <td align="center" style="padding:0 30px 14px;">
+                <div style="display:inline-block;border-radius:999px;background:#FDE8E8;color:#E30613;font-size:15px;font-weight:800;line-height:1;padding:12px 26px;">
+                  <span style="display:inline-block;width:18px;height:18px;border-radius:999px;background:#E30613;color:#ffffff;text-align:center;line-height:18px;margin-right:10px;">&#10003;</span>
+                  Reservering bevestigd
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td align="center" style="padding:0 30px 18px;">
+                <h1 style="margin:0;font-size:42px;line-height:1.08;font-weight:900;letter-spacing:-0.04em;color:#141414;">
+                  Je reservering is bevestigd
                 </h1>
+                <p style="margin:16px 0 0;font-size:16px;line-height:1.6;color:#6B7280;">
+                  We kijken ernaar uit je te verwelkomen bij ${escapeHtml(location)}.
+                </p>
               </td>
             </tr>
             <tr>
-              <td>
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+              <td align="center" style="padding:0 30px 22px;">
+                <div style="display:inline-block;border:1px solid #F1DFC0;border-radius:999px;background:#FFF6E8;color:#141414;font-size:18px;line-height:1.2;font-weight:800;padding:14px 26px;">
+                  &#127915;&nbsp; Reserveringsnummer: <span style="color:#E30613;">${escapeHtml(code)}</span>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 30px 16px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #E8E4DF;border-radius:12px;box-shadow:0 10px 26px rgba(20,20,20,0.06);overflow:hidden;">
                   <tr>
-                    <td width="33.33%" valign="top" style="padding:0 14px 30px 0;">
-                      <div style="font-size:14px;line-height:1.2;font-weight:700;color:#97A1AF;text-transform:uppercase;">Datum</div>
-                      <div style="margin-top:14px;font-size:20px;line-height:1.3;font-weight:700;color:#334155;">${escapeHtml(displayDate)}</div>
+                    <td width="33.33%" style="padding:20px 18px;border-right:1px solid #E8E4DF;border-bottom:1px solid #E8E4DF;">
+                      <div style="font-size:14px;color:#6B7280;">&#128197;&nbsp; Datum</div>
+                      <div style="margin-top:7px;font-size:18px;font-weight:900;color:#141414;">${escapeHtml(longDate)}</div>
                     </td>
-                    <td width="33.33%" valign="top" style="padding:0 14px 30px;">
-                      <div style="font-size:14px;line-height:1.2;font-weight:700;color:#97A1AF;text-transform:uppercase;">Tijd</div>
-                      <div style="margin-top:14px;font-size:20px;line-height:1.3;font-weight:700;color:#334155;">${escapeHtml(time)}</div>
+                    <td width="33.33%" style="padding:20px 18px;border-right:1px solid #E8E4DF;border-bottom:1px solid #E8E4DF;">
+                      <div style="font-size:14px;color:#6B7280;">&#128339;&nbsp; Tijd</div>
+                      <div style="margin-top:7px;font-size:18px;font-weight:900;color:#141414;">${escapeHtml(time)}</div>
                     </td>
-                    <td width="33.33%" valign="top" style="padding:0 0 30px 14px;">
-                      <div style="font-size:14px;line-height:1.2;font-weight:700;color:#97A1AF;text-transform:uppercase;">Gasten</div>
-                      <div style="margin-top:14px;font-size:20px;line-height:1.3;font-weight:700;color:#334155;">${escapeHtml(partySize)}</div>
+                    <td width="33.33%" style="padding:20px 18px;border-bottom:1px solid #E8E4DF;">
+                      <div style="font-size:14px;color:#6B7280;">&#128101;&nbsp; Aantal gasten</div>
+                      <div style="margin-top:7px;font-size:18px;font-weight:900;color:#141414;">${escapeHtml(partySize)} ${partySize === 1 ? "persoon" : "personen"}</div>
                     </td>
                   </tr>
                   <tr>
-                    <td colspan="3" style="padding:2px 0 34px;">
-                      <div style="font-size:14px;line-height:1.2;font-weight:700;color:#97A1AF;text-transform:uppercase;">Naam gast</div>
-                      <div style="margin-top:14px;font-size:20px;line-height:1.4;color:#334155;">${escapeHtml(customerName)}</div>
+                    <td width="33.33%" style="padding:20px 18px;border-right:1px solid #E8E4DF;">
+                      <div style="font-size:14px;color:#6B7280;">&#128100;&nbsp; Naam gast</div>
+                      <div style="margin-top:7px;font-size:18px;font-weight:900;color:#141414;">${escapeHtml(customerName)}</div>
                     </td>
-                  </tr>
-                  <tr>
-                    <td colspan="3" style="padding:0 0 26px;">
-                      <div style="height:1px;background:#E2E8F0;line-height:1px;font-size:1px;">&nbsp;</div>
+                    <td width="33.33%" style="padding:20px 18px;border-right:1px solid #E8E4DF;">
+                      <div style="font-size:14px;color:#6B7280;">&#128205;&nbsp; Locatie</div>
+                      <div style="margin-top:7px;font-size:18px;font-weight:900;color:#141414;">${escapeHtml(location)}</div>
                     </td>
-                  </tr>
-                  <tr>
-                    <td align="center" width="33.33%" style="padding:0 8px;">
-                      <a href="${escapeHtml(calendarUrl)}" style="display:inline-block;text-decoration:none;color:#334155;">
-                        <div style="font-size:31px;line-height:1;color:#F5B942;">&#128197;</div>
-                        <div style="margin-top:11px;font-size:15px;line-height:1.35;color:#334155;">Aan kalender toevoegen</div>
-                      </a>
-                    </td>
-                    <td align="center" width="33.33%" style="padding:0 8px;">
-                      <a href="${escapeHtml(editUrl)}" style="display:inline-block;text-decoration:none;color:#334155;">
-                        <div style="font-size:31px;line-height:1;color:#F5B942;">&#9998;</div>
-                        <div style="margin-top:11px;font-size:15px;line-height:1.35;color:#334155;">Bewerken</div>
-                      </a>
-                    </td>
-                    <td align="center" width="33.33%" style="padding:0 8px;">
-                      <a href="${escapeHtml(cancelUrl)}" style="display:inline-block;text-decoration:none;color:#334155;">
-                        <div style="font-size:31px;line-height:1;color:#F5B942;">&#8855;</div>
-                        <div style="margin-top:11px;font-size:15px;line-height:1.35;color:#334155;">Annuleren</div>
-                      </a>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td colspan="3" align="center" style="padding-top:34px;">
-                      <p style="margin:0;font-size:13px;line-height:1.7;color:#97A1AF;">
-                        ${escapeHtml(location)}${restaurantPhone ? ` &middot; ${escapeHtml(restaurantPhone)}` : ""}
-                      </p>
+                    <td width="33.33%" style="padding:20px 18px;">
+                      <div style="font-size:14px;color:#6B7280;">&#127869;&nbsp; Type</div>
+                      <div style="margin-top:7px;font-size:18px;font-weight:900;color:#141414;">Tafelreservering</div>
                     </td>
                   </tr>
                 </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 30px 14px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #E8E4DF;border-radius:12px;box-shadow:0 10px 26px rgba(20,20,20,0.06);overflow:hidden;">
+                  <tr>
+                    <td width="25%" style="padding:14px;">
+                      <img src="${escapeHtml(locationImageUrl)}" width="210" alt="${escapeHtml(location)}" style="display:block;width:100%;max-width:210px;height:auto;border-radius:8px;border:0;">
+                    </td>
+                    <td width="45%" style="padding:14px 16px;">
+                      <div style="font-size:20px;font-weight:900;color:#141414;margin-bottom:12px;">${escapeHtml(location)}</div>
+                      <div style="font-size:15px;line-height:1.8;color:#4B5563;">&#128205;&nbsp; ${escapeHtml(address)}</div>
+                      <div style="font-size:15px;line-height:1.8;color:#4B5563;">&#128222;&nbsp; ${escapeHtml(shownPhone)}</div>
+                      <div style="font-size:15px;line-height:1.8;color:#4B5563;">&#9993;&nbsp; ${escapeHtml(shownEmail)}</div>
+                      <div style="font-size:14px;line-height:1.5;color:#6B7280;margin-top:8px;">Meld je bij aankomst even bij ons team.</div>
+                    </td>
+                    <td width="30%" style="padding:14px 18px;">
+                      <a href="${escapeHtml(routeUrl)}" style="display:block;text-align:center;text-decoration:none;border:1px solid #E30613;border-radius:8px;color:#E30613;font-size:15px;font-weight:800;padding:16px 12px;margin-bottom:12px;">
+                        &#10148;&nbsp; Route bekijken
+                      </a>
+                      <a href="tel:${escapeHtml(shownPhone.replace(/\s+/g, ""))}" style="display:block;text-align:center;text-decoration:none;border:1px solid #E30613;border-radius:8px;color:#E30613;font-size:15px;font-weight:800;padding:16px 12px;">
+                        &#128222;&nbsp; Bel restaurant
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 30px 14px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #E8E4DF;border-radius:12px;box-shadow:0 10px 26px rgba(20,20,20,0.06);overflow:hidden;">
+                  <tr>
+                    <td align="center" width="33.33%" style="padding:18px 14px;border-right:1px solid #E8E4DF;">
+                      <a href="${escapeHtml(calendarUrl)}" style="text-decoration:none;color:#141414;font-size:15px;font-weight:800;">&#128197;&nbsp; Aan kalender toevoegen &nbsp;<span style="color:#E30613;">&#8250;</span></a>
+                    </td>
+                    <td align="center" width="33.33%" style="padding:18px 14px;border-right:1px solid #E8E4DF;">
+                      <a href="${escapeHtml(editUrl)}" style="text-decoration:none;color:#141414;font-size:15px;font-weight:800;">&#9998;&nbsp; Reservering wijzigen &nbsp;<span style="color:#E30613;">&#8250;</span></a>
+                    </td>
+                    <td align="center" width="33.33%" style="padding:18px 14px;">
+                      <a href="${escapeHtml(cancelUrl)}" style="text-decoration:none;color:#141414;font-size:15px;font-weight:800;">&#10006;&nbsp; Reservering annuleren &nbsp;<span style="color:#E30613;">&#8250;</span></a>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 30px 22px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #E8E4DF;border-radius:12px;box-shadow:0 10px 26px rgba(20,20,20,0.06);">
+                  <tr>
+                    <td style="padding:20px 24px;">
+                      <div style="font-size:20px;font-weight:900;color:#141414;margin-bottom:14px;">&#8505;&nbsp; Goed om te weten</div>
+                      <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                        <tr>
+                          <td width="50%" style="font-size:14px;line-height:1.7;color:#4B5563;padding:5px 18px 5px 0;">&#128339;&nbsp; Kom bij voorkeur 5 minuten voor aanvang.</td>
+                          <td width="50%" style="font-size:14px;line-height:1.7;color:#4B5563;padding:5px 0 5px 18px;">&#127811;&nbsp; Dieetwensen of allergie&euml;n? Reageer op deze e-mail of bel ons.</td>
+                        </tr>
+                        <tr>
+                          <td width="50%" style="font-size:14px;line-height:1.7;color:#4B5563;padding:5px 18px 5px 0;">&#128276;&nbsp; Kun je niet komen? Laat het ons op tijd weten.</td>
+                          <td width="50%" style="font-size:14px;line-height:1.7;color:#4B5563;padding:5px 0 5px 18px;">&#9201;&nbsp; Je tafel wordt 15 minuten vastgehouden na de gereserveerde tijd.</td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td align="center" style="padding:16px 30px 30px;border-top:1px solid #E8E4DF;">
+                <p style="margin:0;font-size:14px;line-height:1.7;color:#4B5563;">
+                  <strong style="color:#E30613;font-size:20px;">xin ch&agrave;o</strong>
+                  &nbsp;&nbsp; ${escapeHtml(location)} &nbsp;&bull;&nbsp; ${escapeHtml(addressParts.street)}${addressParts.postalCity ? ` &nbsp;&bull;&nbsp; ${escapeHtml(shownPhone)}` : ""}
+                </p>
+                <p style="margin:6px 0 0;font-size:12px;line-height:1.6;color:#6B7280;">
+                  Deze bevestiging is automatisch verstuurd. Bewaar deze e-mail voor je administratie.
+                </p>
               </td>
             </tr>
           </table>

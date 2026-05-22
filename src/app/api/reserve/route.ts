@@ -35,7 +35,16 @@ export async function POST(req: Request) {
 
     const location = await prisma.location.findUnique({
       where: { id: locationId },
-      select: { capacity: true, name: true, phone: true, openTime: true, closeTime: true },
+      select: {
+        capacity: true,
+        name: true,
+        slug: true,
+        address: true,
+        email: true,
+        phone: true,
+        openTime: true,
+        closeTime: true,
+      },
     });
 
     if (!location) {
@@ -82,12 +91,16 @@ export async function POST(req: Request) {
     if (email) {
       await sendReservationEmail({
         to: email,
+        reservationId: reservation.id,
         customerName: name,
         partySize: party,
-        date: new Date(date).toLocaleDateString("en-GB"),
+        date,
         time,
-        location: location?.name ?? "",
-        restaurantPhone: location?.phone ?? "",
+        location: location.name,
+        locationSlug: location.slug,
+        restaurantAddress: location.address,
+        restaurantEmail: location.email ?? "hello@xinchao.nl",
+        restaurantPhone: location.phone,
       }).catch(console.error);
     }
 
