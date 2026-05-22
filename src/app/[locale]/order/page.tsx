@@ -9,7 +9,6 @@ import {
   Clock3,
   HeartHandshake,
   Leaf,
-  LocateFixed,
   LockKeyhole,
   MapPin,
   Soup,
@@ -199,7 +198,6 @@ export default function OrderPickupPage() {
   const [selectedLocationId, setSelectedLocationId] = useState("utrecht");
   const [locations, setLocations] = useState<PickupLocation[]>(pickupLocations);
   const [savingSelection, setSavingSelection] = useState(false);
-  const [locationPickerOpen, setLocationPickerOpen] = useState(false);
   const [dayPickerOpen, setDayPickerOpen] = useState(false);
   const menuHref = useMemo(() => `/${locale}/menu`, [locale]);
   const selectedLocation = useMemo(
@@ -267,13 +265,8 @@ export default function OrderPickupPage() {
             <LocationCard
               location={selectedLocation}
               locations={locations}
-              pickerOpen={locationPickerOpen}
-              onPickerOpenChange={setLocationPickerOpen}
               copy={copy}
-              onSelectLocation={(locationId) => {
-                setSelectedLocationId(locationId);
-                setLocationPickerOpen(false);
-              }}
+              onSelectLocation={setSelectedLocationId}
             />
             <TimeSlotSelector selectedTime={selectedTime} onSelect={setSelectedTime} copy={copy} />
             <StatusRow selectedDay={selectedDay} copy={copy} />
@@ -391,100 +384,73 @@ function Hero({ copy }: { copy: OrderCopy }) {
 function LocationCard({
   location,
   locations,
-  pickerOpen,
-  onPickerOpenChange,
   copy,
   onSelectLocation,
 }: {
   location: PickupLocation;
   locations: PickupLocation[];
-  pickerOpen: boolean;
-  onPickerOpenChange: (open: boolean) => void;
   copy: OrderCopy;
   onSelectLocation: (locationId: string) => void;
 }) {
   return (
-    <section className="rounded-[24px] border border-[#E8E4DF] bg-white p-5 shadow-[0_18px_50px_rgba(20,20,20,0.06)] sm:p-6">
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex min-w-0 items-start gap-4">
-          <Image
-            src={location.imageSrc}
-            alt={`${location.name} exterior`}
-            width={88}
-            height={88}
-            className="h-20 w-20 shrink-0 rounded-2xl object-cover sm:h-[88px] sm:w-[88px]"
-          />
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <h2 className="text-lg font-bold leading-tight text-[#141414]">{location.name}</h2>
-              <span className="inline-flex items-center gap-1.5 text-sm font-medium text-[#1BA84A]">
-                <span className="h-2 w-2 rounded-full bg-[#1BA84A]" aria-hidden="true" />
-                {copy.open}
-              </span>
-            </div>
-            <p className="mt-2 flex items-center gap-2 text-sm text-[#6B6B6B]">
-              <MapPin className="h-4 w-4 shrink-0" aria-hidden="true" />
-              {location.address}
-            </p>
-            <p className="mt-1.5 flex items-center gap-2 text-sm text-[#6B6B6B]">
-              <Clock3 className="h-4 w-4 shrink-0" aria-hidden="true" />
-              {copy.openTodayUntil} {location.openUntil}
-            </p>
-          </div>
-        </div>
-        <button
-          type="button"
-          aria-expanded={pickerOpen}
-          aria-controls="location-picker"
-          onClick={() => onPickerOpenChange(!pickerOpen)}
-          className="flex min-h-11 max-w-full items-center justify-center gap-2 self-stretch rounded-2xl border border-[#E8E4DF] bg-white px-4 py-3 text-sm font-semibold text-[#141414] transition hover:border-[#E30613]/35 hover:bg-[#FFF6F6] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[#E30613] sm:inline-flex sm:self-start lg:self-auto"
-        >
-          <LocateFixed className="h-4 w-4 text-[#6B6B6B]" aria-hidden="true" />
-          {copy.changeLocation}
-        </button>
-      </div>
-      {pickerOpen && (
-        <div id="location-picker" className="mt-5 grid gap-3 border-t border-[#E8E4DF] pt-5 sm:grid-cols-2">
-          {locations.map((option) => {
-            const selected = option.id === location.id;
+    <section className="space-y-3" aria-labelledby="pickup-location-heading">
+      <h2 id="pickup-location-heading" className="sr-only">
+        {copy.changeLocation}
+      </h2>
+      <div className="grid gap-4 lg:grid-cols-2">
+        {locations.map((option) => {
+          const selected = option.id === location.id;
 
-            return (
-              <button
-                key={option.id}
-                type="button"
-                aria-pressed={selected}
-                onClick={() => onSelectLocation(option.id)}
-                className={[
-                  "flex min-h-[112px] items-center gap-4 rounded-[20px] border bg-white p-4 text-left transition hover:-translate-y-0.5 hover:border-[#E30613]/45 hover:bg-[#FFF6F6] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[#E30613]",
-                  selected ? "border-[#E30613] ring-4 ring-[#E30613]/8" : "border-[#E8E4DF]",
-                ].join(" ")}
-              >
-                <Image
-                  src={option.imageSrc}
-                  alt={`${option.name} exterior`}
-                  width={72}
-                  height={72}
-                  className="h-[72px] w-[72px] shrink-0 rounded-2xl object-cover"
-                />
-                <span className="min-w-0 flex-1">
-                  <span className="block font-bold text-[#141414]">{option.name}</span>
-                  <span className="mt-1 block text-sm leading-5 text-[#6B6B6B]">{option.address}</span>
-                  <span className="mt-1.5 inline-flex items-center gap-1.5 text-sm font-medium text-[#1BA84A]">
+          return (
+            <button
+              key={option.id}
+              type="button"
+              aria-pressed={selected}
+              onClick={() => onSelectLocation(option.id)}
+              className={[
+                "group flex min-h-[152px] items-start gap-4 rounded-[24px] border bg-white p-5 text-left shadow-[0_18px_50px_rgba(20,20,20,0.06)] transition hover:-translate-y-0.5 hover:border-[#E30613]/45 hover:shadow-[0_22px_54px_rgba(20,20,20,0.08)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[#E30613] sm:p-6",
+                selected ? "border-[#E30613] ring-4 ring-[#E30613]/8" : "border-[#E8E4DF]",
+              ].join(" ")}
+            >
+              <Image
+                src={option.imageSrc}
+                alt={`${option.name} exterior`}
+                width={88}
+                height={88}
+                className="h-20 w-20 shrink-0 rounded-2xl object-cover sm:h-[88px] sm:w-[88px]"
+              />
+              <span className="min-w-0 flex-1">
+                <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span className="text-lg font-bold leading-tight text-[#141414]">{option.name}</span>
+                  <span className="inline-flex items-center gap-1.5 text-sm font-medium text-[#1BA84A]">
                     <span className="h-2 w-2 rounded-full bg-[#1BA84A]" aria-hidden="true" />
-                    {copy.openUntil} {option.openUntil}
+                    {copy.open}
                   </span>
                 </span>
-                {selected && (
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#E30613] text-white">
-                    <Check className="h-4 w-4" aria-hidden="true" />
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      )}
-      <div className="mt-6 border-t border-[#E8E4DF]" />
+                <span className="mt-2 flex items-center gap-2 text-sm text-[#6B6B6B]">
+                  <MapPin className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  {option.address}
+                </span>
+                <span className="mt-1.5 flex items-center gap-2 text-sm text-[#6B6B6B]">
+                  <Clock3 className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  {copy.openTodayUntil} {option.openUntil}
+                </span>
+              </span>
+              <span
+                className={[
+                  "flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition",
+                  selected
+                    ? "border-[#E30613] bg-[#E30613] text-white"
+                    : "border-[#E8E4DF] bg-white text-transparent group-hover:border-[#E30613]/40",
+                ].join(" ")}
+                aria-hidden="true"
+              >
+                <Check className="h-4 w-4" />
+              </span>
+            </button>
+          );
+        })}
+      </div>
     </section>
   );
 }
