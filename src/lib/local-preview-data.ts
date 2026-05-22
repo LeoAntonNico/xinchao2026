@@ -5,7 +5,7 @@ export const previewLocations = [
     slug: "utrecht",
     address: "Voor Clarenburg 6, 3511 JE Utrecht",
     phone: "+31 30 123 4567",
-    email: "utrecht@xinchaorestaurant.nl",
+    email: "hello@xinchao.nl",
     openTime: "12:00",
     closeTime: "21:00",
     openingHours: [
@@ -25,7 +25,7 @@ export const previewLocations = [
     slug: "wageningen",
     address: "Hoogstraat 18, 6701 BT Wageningen",
     phone: "+31 317 765 4321",
-    email: "wageningen@xinchaorestaurant.nl",
+    email: "hello@xinchao.nl",
     openTime: "12:00",
     closeTime: "20:00",
     openingHours: [
