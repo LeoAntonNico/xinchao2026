@@ -140,7 +140,9 @@ export default function ReservePage() {
     let h = oh;
     let m = om;
 
-    while (h < ch || (h === ch && m <= cm)) {
+    const lastReservationMinutes = ch * 60 + cm - 30;
+
+    while (h * 60 + m <= lastReservationMinutes) {
       slots.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
       m += 30;
       if (m >= 60) { m = 0; h += 1; }

@@ -4,6 +4,18 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { sendReservationEmail } from "@/lib/notifications";
 
+function parseTimeToMinutes(time: unknown) {
+  if (typeof time !== "string") return null;
+  const match = time.match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return null;
+
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+
+  return hours * 60 + minutes;
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -23,11 +35,27 @@ export async function POST(req: Request) {
 
     const location = await prisma.location.findUnique({
       where: { id: locationId },
-      select: { capacity: true, name: true, phone: true },
+      select: { capacity: true, name: true, phone: true, openTime: true, closeTime: true },
     });
 
     if (!location) {
       return NextResponse.json({ error: "Location not found" }, { status: 404 });
+    }
+
+    const reservationMinutes = parseTimeToMinutes(time);
+    const openMinutes = parseTimeToMinutes(location.openTime);
+    const closeMinutes = parseTimeToMinutes(location.closeTime);
+    if (
+      reservationMinutes === null ||
+      openMinutes === null ||
+      closeMinutes === null ||
+      reservationMinutes < openMinutes ||
+      reservationMinutes > closeMinutes - 30
+    ) {
+      return NextResponse.json(
+        { error: "Selected time is outside reservation hours" },
+        { status: 400 }
+      );
     }
 
     const booked = existing._sum.partySize || 0;
