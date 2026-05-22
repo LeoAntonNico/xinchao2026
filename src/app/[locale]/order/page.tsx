@@ -11,7 +11,6 @@ import {
   Leaf,
   LockKeyhole,
   MapPin,
-  Soup,
   Utensils,
 } from "lucide-react";
 import Image from "next/image";
@@ -102,12 +101,9 @@ function getOrderCopy(locale: string) {
     heroLine1: isNl ? "Wanneer wil je" : "When do you want",
     heroLine2: isNl ? "je bestelling ophalen?" : "to pick up your order?",
     heroSubtitle: isNl ? "We bereiden het vers en zetten het voor je klaar." : "We'll have it freshly prepared and ready for you.",
-    kitchenBusy: isNl ? "Keuken druk: +10 min" : "Kitchen busy: +10 min",
     open: isNl ? "Open" : "Open",
     openTodayUntil: isNl ? "Vandaag open tot" : "Open today until",
     openUntil: isNl ? "Open tot" : "Open until",
-    orderBefore: isNl ? "Bestel voor" : "Order before",
-    orderBeforeSuffix: isNl ? "om op te halen" : "for pickup",
     pickupDay: isNl ? "Afhaaldag" : "Pickup day",
     pickupDate: isNl ? "Selecteer afhaaldatum" : "Select pickup date",
     recommended: isNl ? "Aanbevolen" : "Recommended",
@@ -183,12 +179,6 @@ function buildPickupTimeSlots(location: PickupLocation): TimeSlot[] {
   }
 
   return slots;
-}
-
-function pickupOrderCutoff(location: PickupLocation) {
-  const closeMinutes = parseTimeToMinutes(location.openUntil);
-  if (closeMinutes === null) return location.openUntil;
-  return formatMinutesAsTime(Math.max(closeMinutes - 15, 0));
 }
 
 function getPickupDay(dateValue: string, locale: string): PickupDay {
@@ -313,7 +303,6 @@ export default function OrderPickupPage() {
               onSelectLocation={setSelectedLocationId}
             />
             <TimeSlotSelector slots={availableTimeSlots} selectedTime={selectedTime} onSelect={setSelectedTime} copy={copy} />
-            <StatusRow selectedDay={selectedDay} selectedLocation={selectedLocation} copy={copy} />
             <AnotherDayCard
               selectedDay={selectedDay}
               selectedDate={selectedDate}
@@ -549,25 +538,6 @@ function TimeSlotSelector({
         </div>
       </div>
     </section>
-  );
-}
-
-function StatusRow({ selectedDay, selectedLocation, copy }: { selectedDay: PickupDay; selectedLocation: PickupLocation; copy: OrderCopy }) {
-  const orderCutoffLabel = selectedDay.summaryLabel === "Today" || selectedDay.summaryLabel === "Vandaag" ? copy.today : selectedDay.summaryLabel;
-  const cutoffTime = pickupOrderCutoff(selectedLocation);
-
-  return (
-    <div className="flex flex-col gap-3 rounded-[20px] border border-[#E8E4DF] bg-white px-5 py-4 text-sm font-medium text-[#6B6B6B] sm:flex-row sm:items-center sm:gap-5">
-      <p className="flex items-center gap-2 text-[#E30613]">
-        <Soup className="h-4 w-4" aria-hidden="true" />
-        <span>{copy.kitchenBusy}</span>
-      </p>
-      <div className="hidden h-5 w-px bg-[#E8E4DF] sm:block" aria-hidden="true" />
-      <p className="flex items-center gap-2">
-        <Clock3 className="h-4 w-4" aria-hidden="true" />
-        <span>{copy.orderBefore} {cutoffTime} {copy.orderBeforeSuffix} {orderCutoffLabel}</span>
-      </p>
-    </div>
   );
 }
 
