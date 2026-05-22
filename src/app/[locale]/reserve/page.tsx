@@ -89,6 +89,10 @@ function reservationCode(id: string) {
   return `XC-${id.slice(-4).toUpperCase()}`;
 }
 
+function minimumPartySize(location?: Location) {
+  return location?.slug === "utrecht" ? 3 : 1;
+}
+
 export default function ReservePage() {
   const locale = useLocale();
   const isNl = locale === "nl";
@@ -127,6 +131,13 @@ export default function ReservePage() {
   }, [form.locationId, form.date]);
 
   const selectedLocation = locations.find((l) => l.id === form.locationId);
+  const minPartySize = minimumPartySize(selectedLocation);
+
+  useEffect(() => {
+    if (form.partySize < minPartySize) {
+      setForm((current) => ({ ...current, partySize: minPartySize }));
+    }
+  }, [form.partySize, minPartySize]);
 
   /* Generate 30-minute time slots from open → close, filtering out past times for today */
   const times = (() => {
@@ -285,7 +296,16 @@ export default function ReservePage() {
                   <div className="relative">
                     <select
                       value={form.locationId}
-                      onChange={(e) => setForm({ ...form, locationId: e.target.value, time: "" })}
+                      onChange={(e) => {
+                        const nextLocation = locations.find((loc) => loc.id === e.target.value);
+                        const nextMinPartySize = minimumPartySize(nextLocation);
+                        setForm({
+                          ...form,
+                          locationId: e.target.value,
+                          time: "",
+                          partySize: Math.max(form.partySize, nextMinPartySize),
+                        });
+                      }}
                       required
                       className="w-full px-4 py-3.5 bg-white border border-gray-200 text-foreground text-[14px] focus:border-logo-red focus:outline-none transition-colors appearance-none"
                     >
@@ -328,7 +348,7 @@ export default function ReservePage() {
                         required
                         className="w-full px-4 py-3.5 bg-white border border-gray-200 text-foreground text-[14px] focus:border-logo-red focus:outline-none transition-colors appearance-none"
                       >
-                        {Array.from({ length: 20 }, (_, i) => i + 1).map((n) => (
+                        {Array.from({ length: 20 - minPartySize + 1 }, (_, i) => i + minPartySize).map((n) => (
                           <option key={n} value={n}>
                             {n} {isNl ? (n === 1 ? "persoon" : "personen") : (n === 1 ? "person" : "people")}
                           </option>
