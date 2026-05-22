@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { cleanExclusionLabel } from "@/lib/cart-display";
 
 const smtpHost = process.env.SMTP_HOST ?? "smtp.transip.email";
 const smtpPort = parseInt(process.env.SMTP_PORT ?? "587", 10);
@@ -112,6 +113,170 @@ function buildCalendarUrl(args: {
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
 
+function formatEmailPrice(value: number) {
+  return `€ ${value.toFixed(2).replace(".", ",")}`;
+}
+
+function formatOrderDate(date: string) {
+  const parsed = new Date(date);
+  if (Number.isNaN(parsed.getTime())) return date;
+
+  return new Intl.DateTimeFormat("nl-NL", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    timeZone: "Europe/Amsterdam",
+  }).format(parsed);
+}
+
+type OrderEmailItem = {
+  name: string;
+  qty: number;
+  unitPrice?: number;
+  variantName?: string | null;
+  modifierNames?: string[];
+  exclusionNames?: string[];
+};
+
+function formatOrderItemChoices(item: OrderEmailItem) {
+  return [
+    item.variantName || "",
+    ...(item.modifierNames || []),
+    ...(item.exclusionNames || []).map(cleanExclusionLabel),
+  ].filter(Boolean);
+}
+
+function buildOrderPaidHtml(args: {
+  orderId: string;
+  customerName: string;
+  total: number;
+  items: OrderEmailItem[];
+  location: string;
+  pickupDate: string;
+  pickupTime: string;
+}) {
+  const baseUrl = (process.env.NEXT_PUBLIC_BASE_URL || "https://xinchao.nl").replace(/\/$/, "");
+  const logoUrl = `${baseUrl}/images/logo.png`;
+  const shortOrderId = args.orderId.slice(-12).toUpperCase();
+  const subtotal = args.total / 1.09;
+  const tax = args.total - subtotal;
+  const itemRows = args.items.map((item) => {
+    const choices = formatOrderItemChoices(item);
+    const lineTotal = item.unitPrice === undefined ? "" : formatEmailPrice(item.unitPrice * item.qty);
+    return `<tr>
+      <td style="padding:14px 0;border-bottom:1px solid #E5E7EB;color:#4B5563;font-size:13px;line-height:1.45;">
+        <strong style="color:#374151;">${escapeHtml(item.qty)}x</strong>
+      </td>
+      <td style="padding:14px 12px;border-bottom:1px solid #E5E7EB;color:#374151;font-size:13px;line-height:1.45;">
+        <strong>${escapeHtml(item.name)}</strong>
+        ${choices.length > 0 ? `<div style="margin-top:6px;color:#6B7280;font-size:12px;line-height:1.5;">${choices.map(escapeHtml).join(" &middot; ")}</div>` : ""}
+      </td>
+      <td align="right" style="padding:14px 0;border-bottom:1px solid #E5E7EB;color:#374151;font-size:13px;line-height:1.45;white-space:nowrap;">
+        ${escapeHtml(lineTotal)}
+      </td>
+    </tr>`;
+  }).join("");
+
+  return `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Bedankt voor je bestelling</title>
+  </head>
+  <body style="margin:0;background:#F4F4F4;color:#4B5563;font-family:Arial,Helvetica,sans-serif;">
+    <div style="display:none;max-height:0;overflow:hidden;color:transparent;">
+      Bedankt voor je bestelling. Jouw gekozen gerechten worden vers voor jou gemaakt.
+    </div>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#F4F4F4;">
+      <tr>
+        <td align="center" style="padding:28px 12px;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;">
+            <tr>
+              <td align="center" style="padding:20px 28px 8px;">
+                <img src="${escapeHtml(logoUrl)}" width="165" alt="Xin Chao" style="display:block;border:0;max-width:165px;height:auto;">
+              </td>
+            </tr>
+            <tr>
+              <td align="center" style="padding:18px 32px 0;">
+                <h1 style="margin:0 0 16px;font-size:25px;line-height:1.25;font-weight:800;color:#4A4A4A;">
+                  Bedankt voor je bestelling!
+                </h1>
+                <div style="height:1px;background:#E5E7EB;line-height:1px;font-size:1px;">&nbsp;</div>
+              </td>
+            </tr>
+            <tr>
+              <td align="center" style="padding:24px 34px 18px;">
+                <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#777777;">Beste ${escapeHtml(args.customerName)},</p>
+                <p style="margin:0;font-size:14px;line-height:1.7;color:#777777;">
+                  Bedankt voor je bestelling! Jouw gekozen gerechten worden vers voor jou gemaakt en dat proef je meteen. Wij gaan aan de slag om deze zo snel mogelijk voor jou klaar te hebben.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 32px 18px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-top:1px solid #E5E7EB;border-bottom:1px solid #E5E7EB;">
+                  <tr>
+                    <td align="center" width="33.33%" style="padding:18px 8px;">
+                      <div style="font-size:13px;line-height:1.2;font-weight:800;color:#009846;">Order Nr</div>
+                      <div style="margin-top:8px;font-size:13px;color:#777777;">${escapeHtml(shortOrderId)}</div>
+                    </td>
+                    <td align="center" width="33.33%" style="padding:18px 8px;">
+                      <div style="font-size:13px;line-height:1.2;font-weight:800;color:#009846;">Ophaaltijdstip</div>
+                      <div style="margin-top:8px;font-size:13px;color:#777777;">${escapeHtml(formatOrderDate(args.pickupDate))} ${escapeHtml(args.pickupTime)}</div>
+                    </td>
+                    <td align="center" width="33.33%" style="padding:18px 8px;">
+                      <div style="font-size:13px;line-height:1.2;font-weight:800;color:#009846;">Betaalwijze</div>
+                      <div style="margin-top:8px;font-size:13px;color:#777777;">iDEAL</div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 24px 0;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                  ${itemRows}
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:18px 24px 16px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                  <tr>
+                    <td style="padding:8px 0;color:#555555;font-size:13px;">Subtotaal</td>
+                    <td align="right" style="padding:8px 0;color:#555555;font-size:13px;">${escapeHtml(formatEmailPrice(subtotal))}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:8px 0;color:#555555;font-size:13px;">BTW (9%)</td>
+                    <td align="right" style="padding:8px 0;color:#555555;font-size:13px;">${escapeHtml(formatEmailPrice(tax))}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:12px 0 4px;border-top:1px solid #E5E7EB;color:#333333;font-size:14px;font-weight:800;">Totaal</td>
+                    <td align="right" style="padding:12px 0 4px;border-top:1px solid #E5E7EB;color:#333333;font-size:14px;font-weight:800;">${escapeHtml(formatEmailPrice(args.total))}</td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td align="center" style="padding:22px 32px 32px;border-top:1px solid #E5E7EB;">
+                <p style="margin:0 0 6px;font-size:16px;line-height:1.4;color:#4A4A4A;font-weight:800;">
+                  Je bestelling wordt klaargemaakt bij:
+                </p>
+                <p style="margin:0;font-size:14px;line-height:1.7;color:#777777;">
+                  <strong style="color:#B48720;">Xin Chao</strong><br>
+                  ${escapeHtml(args.location)}
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+}
+
 export async function sendOrderPendingEmail(args: {
   to: string;
   orderId: string;
@@ -150,30 +315,38 @@ export async function sendOrderPaidEmail(args: {
   orderId: string;
   customerName: string;
   total: number;
-  items: { name: string; qty: number }[];
+  items: OrderEmailItem[];
   location: string;
   pickupDate: string;
   pickupTime: string;
 }) {
   const { to, orderId, customerName, total, items, location, pickupDate, pickupTime } = args;
-  const itemList = items.map((item) => `${item.qty}x ${item.name}`).join("\n");
+  const itemList = items.map((item) => {
+    const choices = formatOrderItemChoices(item);
+    return `${item.qty}x ${item.name}${choices.length > 0 ? ` - ${choices.join(", ")}` : ""}`;
+  }).join("\n");
   const body = `Hi ${customerName},
 
-Payment confirmed!
+Bedankt voor je bestelling!
 Order ID: ${orderId}
 Total: EUR ${total.toFixed(2).replace(".", ",")}
 Location: ${location}
-Pickup: ${pickupDate} at ${pickupTime}
+Ophaaltijdstip: ${pickupDate} at ${pickupTime}
 
 Items:
 ${itemList}
 
-Your food will be ready at the pickup time.
+Jouw gekozen gerechten worden vers voor jou gemaakt en dat proef je meteen. Wij gaan aan de slag om deze zo snel mogelijk voor jou klaar te hebben.
 
 Thank you!
 Xin Chao Vietnamese Restaurant
 `;
-  await sendEmail({ to, subject: `Payment Confirmed - ${orderId}`, text: body });
+  await sendEmail({
+    to,
+    subject: "Bedankt voor je bestelling",
+    text: body,
+    html: buildOrderPaidHtml(args),
+  });
 }
 
 export async function sendReservationEmail(args: {
