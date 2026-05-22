@@ -582,7 +582,7 @@ Xin Chao Vietnamese Restaurant
                       <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
                         <tr>
                           <td width="50%" style="font-size:14px;line-height:1.7;color:#4B5563;padding:5px 18px 5px 0;">&#128339;&nbsp; Kom bij voorkeur 5 minuten voor aanvang.</td>
-                          <td width="50%" style="font-size:14px;line-height:1.7;color:#4B5563;padding:5px 0 5px 18px;">&#127811;&nbsp; Dieetwensen of allergie&euml;n? Reageer op deze e-mail of bel ons.</td>
+                          <td width="50%" style="font-size:14px;line-height:1.7;color:#4B5563;padding:5px 0 5px 18px;">&#127811;&nbsp; Dieetwensen of allergie&euml;n? Laat het ons weten tijdens het bestellen.</td>
                         </tr>
                         <tr>
                           <td width="50%" style="font-size:14px;line-height:1.7;color:#4B5563;padding:5px 18px 5px 0;">&#128276;&nbsp; Kun je niet komen? Laat het ons op tijd weten.</td>
