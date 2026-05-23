@@ -120,7 +120,7 @@ function reservationLocationImage(slug?: string) {
   return slug === "utrecht" ? "/images/utrecht-exterior.jpg" : "/images/wageningen-exterior.jpg";
 }
 
-function reservationCopyEmail(locationSlug?: string, locationName?: string) {
+function locationCopyEmail(locationSlug?: string, locationName?: string) {
   const locationKey = `${locationSlug || ""} ${locationName || ""}`.toLowerCase();
   if (locationKey.includes("utrecht")) return "utrecht@xinchao.nl";
   if (locationKey.includes("wageningen")) return "wageningen@xinchao.nl";
@@ -378,10 +378,11 @@ export async function sendOrderPaidEmail(args: {
   total: number;
   items: OrderEmailItem[];
   location: string;
+  locationSlug?: string;
   pickupDate: string;
   pickupTime: string;
 }) {
-  const { to, orderId, orderNumber, customerName, total, items, location, pickupDate, pickupTime } = args;
+  const { to, orderId, orderNumber, customerName, total, items, location, locationSlug, pickupDate, pickupTime } = args;
   const displayedOrderNumber = orderNumber || orderId.slice(-8).toUpperCase();
   const itemList = items.map((item) => {
     const choices = formatOrderItemChoices(item);
@@ -405,6 +406,7 @@ Xin Chao Vietnamese Restaurant
 `;
   await sendEmail({
     to,
+    bcc: locationCopyEmail(locationSlug, location),
     subject: "Bedankt voor je bestelling",
     text: body,
     html: buildOrderPaidHtml(args),
@@ -631,7 +633,7 @@ Xin Chao Vietnamese Restaurant
 
   await sendEmail({
     to,
-    bcc: reservationCopyEmail(locationSlug, location),
+    bcc: locationCopyEmail(locationSlug, location),
     subject: `Je reservering bij ${location} is bevestigd`,
     text: body,
     html,

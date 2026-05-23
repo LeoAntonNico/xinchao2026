@@ -67,6 +67,7 @@ export async function POST(req: Request) {
             exclusionNames: i.exclusionNames,
           })),
           location: order.location.name,
+          locationSlug: order.location.slug,
           pickupDate: new Date(order.pickupSlot.date).toLocaleDateString("en-GB"),
           pickupTime: order.pickupSlot.time,
         }).catch((err) => console.error("[Mollie Webhook] Email failed:", err));
