@@ -126,7 +126,7 @@ export default function OrderConfirmationPage() {
     );
   }
 
-  const isPaid = order?.status === "PAID";
+  const isPaid = order?.status === "PAID" || order?.status === "COMPLETED";
   const isPending = order?.status === "PENDING";
 
   const total = order?.totalAmount ?? 0;

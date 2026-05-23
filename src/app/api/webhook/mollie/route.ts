@@ -47,7 +47,7 @@ export async function POST(req: Request) {
     if (status === "paid") {
       await prisma.order.update({
         where: { id: order.id },
-        data: { status: "PAID", paidAt: new Date() },
+        data: { status: "COMPLETED", paidAt: new Date() },
       });
 
       // Send confirmation email

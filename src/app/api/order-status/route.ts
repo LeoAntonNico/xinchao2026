@@ -22,16 +22,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Order not found" }, { status: 404 });
   }
 
-  // Poll Mollie for latest status if payment id exists and order still pending
+  // Confirm successful payments without requiring manual status changes in admin.
   if (order.molliePaymentId && (order.status === "PENDING" || order.status === "PAID")) {
     try {
       const payment = await getPayment(order.molliePaymentId);
-      if (payment.status === "paid" && order.status !== "PAID") {
+      if (payment.status === "paid") {
         await prisma.order.update({
           where: { id: order.id },
-          data: { status: "PAID", paidAt: new Date() },
+          data: { status: "COMPLETED", paidAt: new Date() },
         });
-        order.status = "PAID";
+        order.status = "COMPLETED";
       } else if (["canceled", "expired", "failed"].includes(payment.status)) {
         await prisma.order.update({
           where: { id: order.id },
@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  if (order.status === "PAID") {
+  if (order.status === "COMPLETED") {
     ensurePrintJobForOrder(order.id).catch((err) => {
       console.error("[Order Status] Print queue failed:", err);
     });

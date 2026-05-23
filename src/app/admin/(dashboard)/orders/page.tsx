@@ -24,13 +24,13 @@ interface ReceiptPreview {
   text: string;
 }
 
-const statusConfig: Record<string, { label: string; icon: React.ReactNode; color: string; bg: string; next: string | null }> = {
-  PENDING: { label: "Pending", icon: null, color: "text-yellow-400", bg: "bg-yellow-500/15", next: "PAID" },
-  PAID: { label: "Paid", icon: null, color: "text-emerald-400", bg: "bg-emerald-500/15", next: "PREPARING" },
-  PREPARING: { label: "Preparing", icon: null, color: "text-blue-400", bg: "bg-blue-500/15", next: "READY" },
-  READY: { label: "Ready", icon: null, color: "text-brand-gold", bg: "bg-brand-gold/15", next: "COMPLETED" },
-  COMPLETED: { label: "Completed", icon: null, color: "text-gray-400", bg: "bg-gray-500/15", next: null },
-  CANCELLED: { label: "Cancelled", icon: null, color: "text-red-400", bg: "bg-red-500/15", next: null },
+const statusConfig: Record<string, { label: string; icon: React.ReactNode; color: string; bg: string }> = {
+  PENDING: { label: "Pending", icon: null, color: "text-yellow-400", bg: "bg-yellow-500/15" },
+  PAID: { label: "Paid", icon: null, color: "text-emerald-400", bg: "bg-emerald-500/15" },
+  PREPARING: { label: "Preparing", icon: null, color: "text-blue-400", bg: "bg-blue-500/15" },
+  READY: { label: "Ready", icon: null, color: "text-brand-gold", bg: "bg-brand-gold/15" },
+  COMPLETED: { label: "Completed", icon: null, color: "text-gray-400", bg: "bg-gray-500/15" },
+  CANCELLED: { label: "Cancelled", icon: null, color: "text-red-400", bg: "bg-red-500/15" },
 };
 
 const statusOrder = ["PENDING", "PAID", "PREPARING", "READY", "COMPLETED", "CANCELLED"];
@@ -227,15 +227,6 @@ export default function OrdersPage() {
                       >
                         Print
                       </button>
-                      {cfg.next && (
-                        <button
-                          onClick={() => advanceStatus(order.id, cfg.next!)}
-                          disabled={updatingId === order.id}
-                          className="px-2 py-1 rounded text-xs bg-brand-red hover:bg-red-700 text-foreground transition-colors disabled:opacity-50"
-                        >
-                          {`> ${statusConfig[cfg.next].label}`}
-                        </button>
-                      )}
                       {order.status !== "CANCELLED" && order.status !== "COMPLETED" && (
                         <button
                           onClick={() => advanceStatus(order.id, "CANCELLED")}
