@@ -50,6 +50,22 @@ type MenuOrderClientProps = {
   locale: string;
 };
 
+type ApiLocation = {
+  id: string;
+  name: string;
+  slug: string;
+};
+
+type ApiMenuItem = Omit<MenuItemView, "description" | "image"> & {
+  description?: string | null;
+  shortDescription?: string | null;
+  imageUrl?: string | null;
+};
+
+type ApiMenuCategory = Omit<MenuCategoryView, "items"> & {
+  items: ApiMenuItem[];
+};
+
 function getCopy(locale: string) {
   const isNl = locale === "nl";
   return {
@@ -70,6 +86,8 @@ function getCopy(locale: string) {
     filter: "Filter",
     included: isNl ? "Inbegrepen" : "Included",
     increaseQuantity: isNl ? "Aantal verhogen" : "Increase quantity",
+    loadingMenu: isNl ? "Menu laden..." : "Loading menu...",
+    menuUnavailable: isNl ? "Het menu voor deze locatie kon niet worden geladen." : "The menu for this location could not be loaded.",
     menuSubtitle: isNl ? "Authentieke streetfood smaken / elke dag vers" : "Authentic street food flavours / fresh daily",
     myOrder: isNl ? "Mijn bestelling" : "My order",
     noChoices: isNl ? "Geen aanpassingen nodig voor dit gerecht." : "No custom choices needed for this dish.",
@@ -120,40 +138,84 @@ function formatCartChoices(item: {
     .join(" · ");
 }
 
-export default function MenuOrderClient({ categories, dietaryOptions, locale }: MenuOrderClientProps) {
+export default function MenuOrderClient({ dietaryOptions, locale }: MenuOrderClientProps) {
   const { items, addItem, decreaseItem, updateQuantity, total } = useCart();
   const copy = getCopy(locale);
   const [activeCategory, setActiveCategory] = useState("all");
   const [selectedProduct, setSelectedProduct] = useState<MenuItemView | null>(null);
   const [pickupChoice, setPickupChoice] = useState({
+    locationId: "",
+    locationSlug: "utrecht",
     locationName: "Xin Chào Utrecht",
     pickupDate: "",
     pickupTime: "",
   });
+  const [locationCategories, setLocationCategories] = useState<MenuCategoryView[] | null>(null);
+  const [menuLoadFailed, setMenuLoadFailed] = useState(false);
   const dietaryMap = useMemo(() => new Map(dietaryOptions.map((option) => [option.slug, option.label])), [dietaryOptions]);
   const cartQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
 
   useEffect(() => {
-    const readPickupChoice = () => {
-      setPickupChoice({
-        locationName: sessionStorage.getItem("order_locationName") || "Xin Chào Utrecht",
-        pickupDate: sessionStorage.getItem("order_pickupDate") || "",
-        pickupTime: sessionStorage.getItem("order_pickupTime") || "",
-      });
-    };
+    let cancelled = false;
 
-    readPickupChoice();
-    window.addEventListener("storage", readPickupChoice);
-    window.addEventListener("focus", readPickupChoice);
-    return () => {
-      window.removeEventListener("storage", readPickupChoice);
-      window.removeEventListener("focus", readPickupChoice);
-    };
-  }, []);
+    async function loadLocationMenu() {
+      const storedId = sessionStorage.getItem("order_locationId") || "";
+      const storedSlug = sessionStorage.getItem("order_locationSlug") || "utrecht";
+      const locationsResponse = await fetch("/api/locations");
+      if (!locationsResponse.ok) throw new Error("Unable to load locations");
+      const locations = await locationsResponse.json() as ApiLocation[];
+      const location = locations.find((candidate) => candidate.id === storedId || candidate.slug === storedSlug)
+        ?? locations.find((candidate) => candidate.slug === "utrecht")
+        ?? locations[0];
+      if (!location) throw new Error("No location available");
+
+      if (!cancelled) {
+        setPickupChoice({
+          locationId: location.id,
+          locationSlug: location.slug,
+          locationName: location.name,
+          pickupDate: sessionStorage.getItem("order_pickupDate") || "",
+          pickupTime: sessionStorage.getItem("order_pickupTime") || "",
+        });
+      }
+
+      const menuResponse = await fetch(`/api/menu?locationId=${encodeURIComponent(location.id)}&locale=${encodeURIComponent(locale)}`);
+      if (!menuResponse.ok) throw new Error("Unable to load menu");
+      const menu = await menuResponse.json() as ApiMenuCategory[];
+      if (!cancelled) {
+        setLocationCategories(menu
+          .map((category) => ({
+            ...category,
+            items: category.items.map((item) => ({
+              id: item.id,
+              name: item.name,
+              description: item.shortDescription || item.description || "",
+              price: item.price,
+              image: item.imageUrl || "/images/hero-pho.jpg",
+              isDineInOnly: item.isDineInOnly,
+              dietaryTags: item.dietaryTags,
+              variants: item.variants || [],
+              modifiers: item.modifiers || [],
+              exclusions: item.exclusions || [],
+            })),
+          }))
+          .filter((category) => category.items.length > 0));
+        setMenuLoadFailed(false);
+      }
+    }
+
+    loadLocationMenu().catch(() => {
+      if (!cancelled) setMenuLoadFailed(true);
+    });
+
+    return () => { cancelled = true; };
+  }, [locale]);
+
+  const menuCategories = locationCategories ?? [];
 
   const visibleCategories = activeCategory === "all"
-    ? categories
-    : categories.filter((category) => category.slug === activeCategory);
+    ? menuCategories
+    : menuCategories.filter((category) => category.slug === activeCategory);
 
   function addConfiguredItem(
     item: MenuItemView,
@@ -243,10 +305,18 @@ export default function MenuOrderClient({ categories, dietaryOptions, locale }: 
               </button>
             </div>
 
-            <CategoryTabs categories={categories} activeCategory={activeCategory} onChange={setActiveCategory} locale={locale} />
+            {locationCategories && (
+              <CategoryTabs categories={menuCategories} activeCategory={activeCategory} onChange={setActiveCategory} locale={locale} />
+            )}
 
             <div className="mt-9 space-y-14">
-              {visibleCategories.map((category, index) => (
+              {!locationCategories && !menuLoadFailed && (
+                <p className="py-10 text-center text-sm text-[#7E7770]">{copy.loadingMenu}</p>
+              )}
+              {menuLoadFailed && (
+                <p className="py-10 text-center text-sm text-[#E30613]">{copy.menuUnavailable}</p>
+              )}
+              {locationCategories && visibleCategories.map((category, index) => (
                 <MenuSection
                   key={category.id}
                   category={category}
@@ -272,6 +342,7 @@ export default function MenuOrderClient({ categories, dietaryOptions, locale }: 
           }}
           onRemove={(id) => updateQuantity(id, 0)}
           locale={locale}
+          locationName={pickupChoice.locationName}
         />
         <MobileCartBar total={total} cartQuantity={cartQuantity} locale={locale} />
         {selectedProduct && (
@@ -680,6 +751,7 @@ function OrderPanel({
   onIncrease,
   onRemove,
   locale,
+  locationName,
 }: {
   items: Array<{
     menuItemId: string;
@@ -701,6 +773,7 @@ function OrderPanel({
   onIncrease: (id: string) => void;
   onRemove: (id: string) => void;
   locale: string;
+  locationName: string;
 }) {
   const copy = getCopy(locale);
   return (
@@ -710,7 +783,7 @@ function OrderPanel({
           <h2 className="text-2xl font-light uppercase">{copy.myOrder}</h2>
           <p className="mt-3 flex items-center gap-1.5 text-xs text-[#7E7770]">
             <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
-            {copy.takeOut} · Xin Chào Utrecht
+            {copy.takeOut} · {locationName}
           </p>
         </header>
 
