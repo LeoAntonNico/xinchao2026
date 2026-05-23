@@ -71,6 +71,27 @@ function GlobeIcon({ className }: { className?: string }) {
     </svg>
   );
 }
+function LanguageFlag({ locale }: { locale: string }) {
+  if (locale === "nl") {
+    return (
+      <svg aria-hidden="true" viewBox="0 0 18 12" className="h-3 w-[18px] overflow-hidden rounded-[2px] shadow-sm">
+        <path fill="#AE1C28" d="M0 0h18v4H0z" />
+        <path fill="#FFF" d="M0 4h18v4H0z" />
+        <path fill="#21468B" d="M0 8h18v4H0z" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg aria-hidden="true" viewBox="0 0 18 12" className="h-3 w-[18px] overflow-hidden rounded-[2px] shadow-sm">
+      <path fill="#012169" d="M0 0h18v12H0z" />
+      <path stroke="#FFF" strokeWidth="2.4" d="M0 0l18 12M18 0 0 12" />
+      <path stroke="#C8102E" strokeWidth="1.1" d="M0 0l18 12M18 0 0 12" />
+      <path stroke="#FFF" strokeWidth="4" d="M9 0v12M0 6h18" />
+      <path stroke="#C8102E" strokeWidth="2.2" d="M9 0v12M0 6h18" />
+    </svg>
+  );
+}
 
 const navItems = [
   { key: "home", href: "/", icon: HomeIcon },
@@ -136,7 +157,7 @@ export default function Sidebar() {
                 : "border border-white/45 bg-black/20 text-white backdrop-blur-sm hover:bg-black/35"
             }`}
           >
-            <span aria-hidden="true" className="text-base leading-none">{locale === "en" ? "\u{1F1F3}\u{1F1F1}" : "\u{1F1EC}\u{1F1E7}"}</span>
+            <LanguageFlag locale={switchLocale} />
             <span>{switchLanguageFlag}</span>
           </Link>
 
