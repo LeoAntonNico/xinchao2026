@@ -126,7 +126,7 @@ export default function LocationCard({
         {/* Primary actions */}
         <div className="grid grid-cols-2 gap-2 mb-2">
           <Link
-            href={`/${locale}/order`}
+            href={`/${locale}/order?location=${encodeURIComponent(slug)}`}
             onClick={(e) => { e.stopPropagation(); track({ event: "order_clicked", locationId: id, locationName: name, locale }); }}
             className={`flex items-center justify-center gap-1 px-2 py-2 ${accent.bg} text-white text-[12px] font-bold rounded-lg ${accent.hover} transition-colors`}
           >

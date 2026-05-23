@@ -16,7 +16,8 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { useLocale } from "next-intl";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { calculateStatus } from "@/lib/status";
 
 type Step = {
   id: number;
@@ -49,6 +50,7 @@ type PickupLocation = {
   openFrom: string;
   openUntil: string;
   imageSrc: string;
+  hours: Array<{ day: string; hours: string }>;
 };
 
 type OrderCopy = ReturnType<typeof getOrderCopy>;
@@ -69,6 +71,7 @@ const pickupLocations: PickupLocation[] = [
     openFrom: "12:00",
     openUntil: "21:30",
     imageSrc: "/images/utrecht-exterior.jpg",
+    hours: buildWeeklyHours("12:00", "21:30"),
   },
   {
     id: "wageningen",
@@ -78,6 +81,7 @@ const pickupLocations: PickupLocation[] = [
     openFrom: "12:00",
     openUntil: "20:00",
     imageSrc: "/images/wageningen-exterior.jpg",
+    hours: buildWeeklyHours("12:00", "20:00"),
   },
 ];
 
@@ -103,6 +107,8 @@ function getOrderCopy(locale: string) {
     heroSubtitle: isNl ? "We bereiden het vers en zetten het voor je klaar." : "We'll have it freshly prepared and ready for you.",
     open: isNl ? "Open" : "Open",
     openTodayUntil: isNl ? "Vandaag open tot" : "Open today until",
+    opensTodayAt: isNl ? "Vandaag open om" : "Opens today at",
+    opensTomorrowAt: isNl ? "Morgen open om" : "Opens tomorrow at",
     openUntil: isNl ? "Open tot" : "Open until",
     noPickupTimesToday: isNl ? "Er zijn vandaag geen afhaaltijden meer beschikbaar. Kies een andere dag." : "There are no pickup times left today. Choose another day.",
     pickupDay: isNl ? "Afhaaldag" : "Pickup day",
@@ -139,6 +145,10 @@ type ApiLocation = {
   address: string;
   openTime: string;
   closeTime: string;
+  openingHours?:
+    | Array<{ day: string; hours: string }>
+    | Record<string, { open?: string; close?: string }>
+    | null;
 };
 
 type ApiSlot = {
@@ -146,6 +156,27 @@ type ApiSlot = {
   date: string;
   time: string;
 };
+
+function buildWeeklyHours(openFrom: string, openUntil: string) {
+  return ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"].map((day) => ({
+    day,
+    hours: `${openFrom}-${openUntil}`,
+  }));
+}
+
+function normalizeOpeningHours(location: ApiLocation) {
+  if (Array.isArray(location.openingHours)) return location.openingHours;
+
+  if (location.openingHours && typeof location.openingHours === "object") {
+    const hours = Object.entries(location.openingHours).flatMap(([day, schedule]) => {
+      if (typeof schedule.open !== "string" || typeof schedule.close !== "string") return [];
+      return [{ day, hours: `${schedule.open}-${schedule.close}` }];
+    });
+    if (hours.length > 0) return hours;
+  }
+
+  return buildWeeklyHours(location.openTime, location.closeTime);
+}
 
 function locationImage(slug: string) {
   return slug === "wageningen" ? "/images/wageningen-exterior.jpg" : "/images/utrecht-exterior.jpg";
@@ -228,6 +259,8 @@ function getPickupDay(dateValue: string, locale: string): PickupDay {
 export default function OrderPickupPage() {
   const locale = useLocale();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const requestedLocation = searchParams.get("location")?.toLowerCase() || "utrecht";
   const copy = getOrderCopy(locale);
   const localizedSteps = useMemo(
     () => steps.map((step, index) => ({ ...step, label: copy.steps[index] })),
@@ -235,7 +268,7 @@ export default function OrderPickupPage() {
   );
   const [selectedTime, setSelectedTime] = useState("18:15");
   const [selectedDate, setSelectedDate] = useState(todayInputValue);
-  const [selectedLocationId, setSelectedLocationId] = useState("utrecht");
+  const [selectedLocationId, setSelectedLocationId] = useState(requestedLocation);
   const [locations, setLocations] = useState<PickupLocation[]>(pickupLocations);
   const [savingSelection, setSavingSelection] = useState(false);
   const [dayPickerOpen, setDayPickerOpen] = useState(false);
@@ -260,15 +293,18 @@ export default function OrderPickupPage() {
           openFrom: location.openTime,
           openUntil: location.closeTime,
           imageSrc: locationImage(location.slug),
+          hours: normalizeOpeningHours(location),
         }));
         setLocations(nextLocations);
         setSelectedLocationId((current) => {
+          const requested = nextLocations.find((location) => location.slug === requestedLocation);
+          if (requested) return requested.id;
           const currentLocation = nextLocations.find((location) => location.id === current || location.slug === current);
           return currentLocation?.id ?? nextLocations[0].id;
         });
       })
       .catch(() => {});
-  }, []);
+  }, [requestedLocation]);
 
   useEffect(() => {
     const updateNow = () => setAmsterdamNow(getAmsterdamNow());
@@ -331,6 +367,7 @@ export default function OrderPickupPage() {
               location={selectedLocation}
               locations={locations}
               copy={copy}
+              locale={locale}
               onSelectLocation={setSelectedLocationId}
             />
             <TimeSlotSelector slots={availableTimeSlots} selectedTime={selectedTime} onSelect={setSelectedTime} copy={copy} />
@@ -449,11 +486,13 @@ function LocationCard({
   location,
   locations,
   copy,
+  locale,
   onSelectLocation,
 }: {
   location: PickupLocation;
   locations: PickupLocation[];
   copy: OrderCopy;
+  locale: string;
   onSelectLocation: (locationId: string) => void;
 }) {
   return (
@@ -464,6 +503,7 @@ function LocationCard({
       <div className="grid gap-4 lg:grid-cols-2">
         {locations.map((option) => {
           const selected = option.id === location.id;
+          const status = calculateStatus(option.hours, locale);
 
           return (
             <button
@@ -486,9 +526,9 @@ function LocationCard({
               <span className="min-w-0 flex-1">
                 <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
                   <span className="text-lg font-bold leading-tight text-[#141414]">{option.name}</span>
-                  <span className="inline-flex items-center gap-1.5 text-sm font-medium text-[#1BA84A]">
-                    <span className="h-2 w-2 rounded-full bg-[#1BA84A]" aria-hidden="true" />
-                    {copy.open}
+                  <span className={`inline-flex items-center gap-1.5 text-sm font-medium ${status.isOpen ? "text-[#1BA84A]" : "text-[#E30613]"}`}>
+                    <span className={`h-2 w-2 rounded-full ${status.isOpen ? "bg-[#1BA84A]" : "bg-[#E30613]"}`} aria-hidden="true" />
+                    {status.statusLabel}
                   </span>
                 </span>
                 <span className="mt-2 flex items-center gap-2 text-sm text-[#6B6B6B]">
@@ -497,7 +537,11 @@ function LocationCard({
                 </span>
                 <span className="mt-1.5 flex items-center gap-2 text-sm text-[#6B6B6B]">
                   <Clock3 className="h-4 w-4 shrink-0" aria-hidden="true" />
-                  {copy.openTodayUntil} {option.openUntil}
+                  {status.isOpen
+                    ? `${copy.openTodayUntil} ${status.nextChange}`
+                    : status.nextDay === "tomorrow"
+                      ? `${copy.opensTomorrowAt} ${status.nextChange}`
+                      : `${copy.opensTodayAt} ${status.nextChange}`}
                 </span>
               </span>
               <span

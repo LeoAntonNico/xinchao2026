@@ -12,6 +12,7 @@ export async function GET() {
       address: true,
       openTime: true,
       closeTime: true,
+      openingHours: true,
     },
   }).catch(() => previewLocations.map((loc) => ({
     id: loc.id,
@@ -20,6 +21,7 @@ export async function GET() {
     address: loc.address,
     openTime: loc.openTime,
     closeTime: loc.closeTime,
+    openingHours: loc.openingHours,
   })));
   return NextResponse.json(locations);
 }
