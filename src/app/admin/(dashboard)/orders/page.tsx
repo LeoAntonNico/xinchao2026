@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Eye, Package, RotateCcw, X } from "lucide-react";
+import { Eye, Package, RotateCcw, Trash2, X } from "lucide-react";
 
 interface Order {
   id: string;
@@ -36,7 +36,7 @@ const statusConfig: Record<string, { label: string; icon: React.ReactNode; color
 const statusOrder = ["PENDING", "PAID", "PREPARING", "READY", "COMPLETED", "CANCELLED"];
 
 function formatPrice(cents: number) {
-  return `E$ ${(cents / 100).toFixed(2).replace(".", ",")}`;
+  return `\u20AC ${(cents / 100).toFixed(2).replace(".", ",")}`;
 }
 
 function check401(response: Response) {
@@ -97,6 +97,28 @@ export default function OrdersPage() {
       setReceiptPreview({ orderId: data.orderId, text: data.text });
     } finally {
       setReceiptLoadingId(null);
+    }
+  }
+
+  async function removeOrder(order: Order) {
+    const reference = order.orderNumber || order.id.slice(0, 8);
+    if (!window.confirm(`Permanently remove order ${reference}? This cannot be undone.`)) {
+      return;
+    }
+
+    setUpdatingId(order.id);
+    try {
+      const res = await fetch(`/api/admin/orders/${order.id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (check401(res)) return;
+      if (res.ok) {
+        if (receiptPreview?.orderId === reference) setReceiptPreview(null);
+        await fetchOrders();
+      }
+    } finally {
+      setUpdatingId(null);
     }
   }
 
@@ -233,6 +255,16 @@ export default function OrdersPage() {
                           <RotateCcw className="w-3.5 h-3.5" />
                         </button>
                       )}
+                      <button
+                        onClick={() => removeOrder(order)}
+                        disabled={updatingId === order.id}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs border border-red-500/30 text-red-500 hover:bg-red-500/10 transition-colors disabled:opacity-50"
+                        title="Remove order"
+                        aria-label={`Remove order ${order.orderNumber || order.id.slice(0, 8)}`}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Remove
+                      </button>
                     </div>
                   </td>
                 </tr>

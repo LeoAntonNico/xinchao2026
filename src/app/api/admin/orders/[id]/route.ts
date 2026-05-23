@@ -29,3 +29,30 @@ export async function PATCH(
 
   return NextResponse.json(order);
 }
+
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id } = await params;
+  const order = await prisma.order.findUnique({
+    where: { id },
+    select: { id: true },
+  });
+
+  if (!order) {
+    return NextResponse.json({ error: "Order not found" }, { status: 404 });
+  }
+
+  await prisma.$transaction([
+    prisma.printJob.deleteMany({ where: { orderId: id } }),
+    prisma.order.delete({ where: { id } }),
+  ]);
+
+  return NextResponse.json({ deleted: true });
+}
