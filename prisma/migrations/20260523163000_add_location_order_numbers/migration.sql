@@ -1,0 +1,5 @@
+ALTER TABLE "Location" ADD COLUMN IF NOT EXISTS "nextOrderNumber" INTEGER NOT NULL DEFAULT 999;
+
+ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "orderNumber" TEXT;
+
+CREATE UNIQUE INDEX IF NOT EXISTS "Order_orderNumber_key" ON "Order"("orderNumber");

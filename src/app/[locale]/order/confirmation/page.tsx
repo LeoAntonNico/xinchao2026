@@ -20,6 +20,7 @@ import { formatExclusionForReceipt } from "@/lib/cart-display";
 
 interface OrderData {
   id: string;
+  orderNumber: string | null;
   status: string;
   customerName: string;
   totalAmount: number;
@@ -42,6 +43,7 @@ interface OrderData {
 }
 
 function formatOrderId(order: OrderData) {
+  if (order.orderNumber) return order.orderNumber;
   const d = new Date(order.createdAt);
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, "0");

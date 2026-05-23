@@ -52,6 +52,7 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     id: order.id,
+    orderNumber: order.orderNumber,
     status: order.status,
     customerName: order.customerName,
     totalAmount: order.totalAmount,

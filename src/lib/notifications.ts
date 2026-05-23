@@ -205,6 +205,7 @@ function formatOrderItemChoices(item: OrderEmailItem) {
 
 function buildOrderPaidHtml(args: {
   orderId: string;
+  orderNumber?: string | null;
   customerName: string;
   total: number;
   items: OrderEmailItem[];
@@ -214,7 +215,7 @@ function buildOrderPaidHtml(args: {
 }) {
   const baseUrl = (process.env.NEXT_PUBLIC_BASE_URL || "https://xinchao.nl").replace(/\/$/, "");
   const logoUrl = `${baseUrl}/images/logo.png`;
-  const shortOrderId = args.orderId.slice(-12).toUpperCase();
+  const shortOrderId = args.orderNumber || args.orderId.slice(-8).toUpperCase();
   const subtotal = args.total / 1.09;
   const tax = args.total - subtotal;
   const itemRows = args.items.map((item) => {
@@ -337,6 +338,7 @@ function buildOrderPaidHtml(args: {
 export async function sendOrderPendingEmail(args: {
   to: string;
   orderId: string;
+  orderNumber?: string | null;
   customerName: string;
   total: number;
   items: { name: string; qty: number }[];
@@ -345,12 +347,13 @@ export async function sendOrderPendingEmail(args: {
   pickupTime: string;
   paymentUrl: string;
 }) {
-  const { to, orderId, customerName, total, items, location, pickupDate, pickupTime, paymentUrl } = args;
+  const { to, orderId, orderNumber, customerName, total, items, location, pickupDate, pickupTime, paymentUrl } = args;
+  const displayedOrderNumber = orderNumber || orderId.slice(-8).toUpperCase();
   const itemList = items.map((item) => `${item.qty}x ${item.name}`).join("\n");
   const body = `Hi ${customerName},
 
 Your order has been received. Please complete payment using the link below.
-Order ID: ${orderId}
+Order ID: ${displayedOrderNumber}
 Total: EUR ${total.toFixed(2).replace(".", ",")}
 Location: ${location}
 Pickup: ${pickupDate} at ${pickupTime}
@@ -364,12 +367,13 @@ ${paymentUrl}
 Thank you for ordering!
 Xin Chao Vietnamese Restaurant
 `;
-  await sendEmail({ to, subject: `Order Received - ${orderId}`, text: body });
+  await sendEmail({ to, subject: `Order Received - ${displayedOrderNumber}`, text: body });
 }
 
 export async function sendOrderPaidEmail(args: {
   to: string;
   orderId: string;
+  orderNumber?: string | null;
   customerName: string;
   total: number;
   items: OrderEmailItem[];
@@ -377,7 +381,8 @@ export async function sendOrderPaidEmail(args: {
   pickupDate: string;
   pickupTime: string;
 }) {
-  const { to, orderId, customerName, total, items, location, pickupDate, pickupTime } = args;
+  const { to, orderId, orderNumber, customerName, total, items, location, pickupDate, pickupTime } = args;
+  const displayedOrderNumber = orderNumber || orderId.slice(-8).toUpperCase();
   const itemList = items.map((item) => {
     const choices = formatOrderItemChoices(item);
     return `${item.qty}x ${item.name}${choices.length > 0 ? ` - ${choices.join(", ")}` : ""}`;
@@ -385,7 +390,7 @@ export async function sendOrderPaidEmail(args: {
   const body = `Hi ${customerName},
 
 Bedankt voor je bestelling!
-Order ID: ${orderId}
+Order ID: ${displayedOrderNumber}
 Total: EUR ${total.toFixed(2).replace(".", ",")}
 Location: ${location}
 Ophaaltijdstip: ${pickupDate} at ${pickupTime}

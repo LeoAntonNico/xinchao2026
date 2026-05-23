@@ -27,6 +27,7 @@ interface PrintJob {
   location: string;
   status: string;
   orderId: string | null;
+  orderNumber: string | null;
   attemptCount: number;
   lastError: string | null;
   createdAt: string;
@@ -187,7 +188,7 @@ export default function PrintTestPage() {
               <tr key={job.id} className="border-b border-border-default last:border-0 hover:bg-gray-50">
                 <td className="px-4 py-3 font-mono text-xs text-gray-500">{job.id.slice(0, 8)}</td>
                 <td className="px-4 py-3 text-foreground capitalize">{job.location}</td>
-                <td className="px-4 py-3 text-gray-400 text-xs">{job.orderId ? job.orderId.slice(0, 8) : "test"}</td>
+                <td className="px-4 py-3 text-gray-400 text-xs">{job.orderNumber || (job.orderId ? job.orderId.slice(0, 8) : "test")}</td>
                 <td className="px-4 py-3">
                   <span
                     className={`px-2 py-0.5 rounded text-xs font-medium border ${

@@ -5,6 +5,7 @@ import { Eye, Package, RotateCcw, X } from "lucide-react";
 
 interface Order {
   id: string;
+  orderNumber: string | null;
   status: string;
   customerName: string;
   customerPhone: string;
@@ -155,7 +156,7 @@ export default function OrdersPage() {
               return (
                 <tr key={order.id} className="border-b border-border-default last:border-0 hover:bg-gray-50">
                   <td className="px-4 py-3">
-                    <div className="font-mono text-gray-400 text-xs">{order.id.slice(0, 8)}</div>
+                    <div className="font-mono text-gray-500 text-xs">{order.orderNumber || order.id.slice(0, 8)}</div>
                     <div className="text-gray-500 text-xs">{order.location.name}</div>
                   </td>
                   <td className="px-4 py-3">

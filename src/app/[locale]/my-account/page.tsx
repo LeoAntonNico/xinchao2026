@@ -45,6 +45,7 @@ interface OrderItem {
 
 interface Order {
   id: string;
+  orderNumber: string | null;
   status: string;
   totalAmount: number;
   createdAt: string;
@@ -616,7 +617,7 @@ export default function MyAccountPage() {
                   <div className="flex items-start justify-between mb-3">
                     <div className="space-y-0.5">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold text-[#171717]">#{order.id.slice(-6).toUpperCase()}</span>
+                        <span className="text-xs font-semibold text-[#171717]">#{order.orderNumber || order.id.slice(-8).toUpperCase()}</span>
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-[#F0EDE6] text-[#737373]">
                           {statusIcon(order.status)}
                           {statusLabel(order.status, isNl)}

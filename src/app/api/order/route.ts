@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createPayment } from "@/lib/mollie";
 import { sendOrderPendingEmail } from "@/lib/notifications";
+import { orderNumberPrefix } from "@/lib/order-number";
 
 interface OrderItemInput {
   price: number;
@@ -82,30 +83,40 @@ export async function POST(req: Request) {
       0
     );
 
-    const order = await prisma.order.create({
-      data: {
-        totalAmount: total,
-        customerName: name,
-        customerPhone: phone,
-        customerEmail: email || null,
-        notes: notes || null,
-        customerId: customerId || null,
-        locationId,
-        pickupSlotId: slotId,
-        items: {
-          create: (items as OrderItemInput[]).map((i) => ({
-            quantity: i.quantity,
-            price: i.price,
-            menuItemId: i.menuItemId,
-            variantId: i.variantId || null,
-            variantName: i.variantName || null,
-            modifierIds: i.modifierIds || [],
-            modifierNames: i.modifierNames || [],
-            exclusionIds: i.exclusionIds || [],
-            exclusionNames: i.exclusionNames || [],
-          })),
+    const resolvedLocationId = locationId;
+    const order = await prisma.$transaction(async (tx) => {
+      const sequence = await tx.location.update({
+        where: { id: resolvedLocationId },
+        data: { nextOrderNumber: { increment: 1 } },
+        select: { slug: true, nextOrderNumber: true },
+      });
+
+      return tx.order.create({
+        data: {
+          orderNumber: `${orderNumberPrefix(sequence.slug)}-${sequence.nextOrderNumber}`,
+          totalAmount: total,
+          customerName: name,
+          customerPhone: phone,
+          customerEmail: email || null,
+          notes: notes || null,
+          customerId: customerId || null,
+          locationId: resolvedLocationId,
+          pickupSlotId: slotId,
+          items: {
+            create: (items as OrderItemInput[]).map((i) => ({
+              quantity: i.quantity,
+              price: i.price,
+              menuItemId: i.menuItemId,
+              variantId: i.variantId || null,
+              variantName: i.variantName || null,
+              modifierIds: i.modifierIds || [],
+              modifierNames: i.modifierNames || [],
+              exclusionIds: i.exclusionIds || [],
+              exclusionNames: i.exclusionNames || [],
+            })),
+          },
         },
-      },
+      });
     });
 
     const requestOrigin = new URL(req.url).origin;
@@ -118,7 +129,7 @@ export async function POST(req: Request) {
         : undefined);
     const payment = await createPayment({
       amount: total,
-      description: `Order ${order.id}`,
+      description: `Order ${order.orderNumber || order.id}`,
       redirectUrl: `${baseUrl}/en/order/confirmation?orderId=${order.id}`,
       webhookUrl,
       metadata: { orderId: order.id },
@@ -144,6 +155,7 @@ export async function POST(req: Request) {
       await sendOrderPendingEmail({
         to: email,
         orderId: order.id,
+        orderNumber: order.orderNumber,
         customerName: name,
         total: total / 100,
         items: items.map((i: OrderItemInput) => ({ name: nameMap[i.menuItemId] ?? "Item", qty: i.quantity })),

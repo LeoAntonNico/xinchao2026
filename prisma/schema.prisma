@@ -21,6 +21,7 @@ model Location {
   capacity    Int
   mapEmbedUrl String?
   createdAt   DateTime @default(now())
+  nextOrderNumber Int  @default(999)
 
   menuItems    MenuItem[]
   pickupSlots  PickupSlot[]
@@ -134,6 +135,7 @@ model PickupSlot {
 
 model Order {
   id              String      @id @default(uuid())
+  orderNumber     String?     @unique
   status          OrderStatus @default(PENDING)
   totalAmount     Int // cents
   customerName    String

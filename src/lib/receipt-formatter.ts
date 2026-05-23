@@ -241,6 +241,7 @@ function cleanExclusionLabel(label: string) {
 export function buildReceiptFromOrder(
   order: {
     id: string;
+    orderNumber?: string | null;
     customerName: string;
     customerPhone: string;
     customerEmail?: string | null;
@@ -293,7 +294,7 @@ export function buildReceiptFromOrder(
     city: parsedAddress.city,
     customerName: order.customerName,
     customerPhone: order.customerPhone,
-    orderNumber: order.id.slice(-5).toUpperCase(),
+    orderNumber: order.orderNumber || order.id.slice(-8).toUpperCase(),
     orderDate,
     paymentMethod: "iDEAL | Wero",
     shippingMethod: "Pickup",

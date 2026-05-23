@@ -34,7 +34,7 @@ export async function GET(
   const receipt = buildReceiptFromOrder(order, order.location, order.pickupSlot?.time);
 
   return NextResponse.json({
-    orderId: order.id,
+    orderId: order.orderNumber || order.id.slice(-8).toUpperCase(),
     receipt,
     text: formatReceiptText(receipt),
   });

@@ -55,6 +55,7 @@ export async function POST(req: Request) {
         await sendOrderPaidEmail({
           to: order.customerEmail,
           orderId: order.id,
+          orderNumber: order.orderNumber,
           customerName: order.customerName,
           total: order.totalAmount / 100,
           items: order.items.map((i) => ({

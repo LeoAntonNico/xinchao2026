@@ -18,5 +18,19 @@ export async function GET(req: NextRequest) {
     take: limit,
   });
 
-  return Response.json(jobs);
+  const orderIds = jobs.map((job) => job.orderId).filter((id): id is string => Boolean(id));
+  const orders = orderIds.length
+    ? await prisma.order.findMany({
+        where: { id: { in: orderIds } },
+        select: { id: true, orderNumber: true },
+      })
+    : [];
+  const orderNumbers = new Map(orders.map((order) => [order.id, order.orderNumber]));
+
+  return Response.json(
+    jobs.map((job) => ({
+      ...job,
+      orderNumber: job.orderId ? orderNumbers.get(job.orderId) || null : null,
+    }))
+  );
 }
