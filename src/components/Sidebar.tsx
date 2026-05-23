@@ -89,6 +89,8 @@ export default function Sidebar() {
 
   const switchLocale = locale === "en" ? "nl" : "en";
   const currentPath = pathname.replace("/" + locale, "");
+  const switchLanguageLabel = locale === "en" ? "Nederlands" : "English";
+  const switchLanguageFlag = locale === "en" ? "NL" : "EN";
 
   // Scroll detection for header background
   useEffect(() => {
@@ -123,18 +125,34 @@ export default function Sidebar() {
           </span>
         </Link>
 
-        <button
-          className={`p-2 rounded-md transition-colors ${
-            scrolled
-              ? "text-foreground hover:bg-surface-container"
-              : "text-white hover:bg-white/10"
-          }`}
-          onClick={() => setMobileOpen(!mobileOpen)}
-          aria-label={mobileOpen ? "Close menu" : "Open menu"}
-          aria-expanded={mobileOpen}
-        >
-          {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-        </button>
+        <div className="flex items-center gap-1.5">
+          <Link
+            href={getHref(switchLocale, currentPath)}
+            hrefLang={switchLocale}
+            aria-label={`Switch language to ${switchLanguageLabel}`}
+            className={`inline-flex h-11 min-w-11 items-center justify-center gap-1.5 rounded-full px-2.5 text-xs font-semibold transition-colors ${
+              scrolled
+                ? "border border-outline-variant bg-surface-bright text-foreground hover:bg-surface-container"
+                : "border border-white/45 bg-black/20 text-white backdrop-blur-sm hover:bg-black/35"
+            }`}
+          >
+            <span aria-hidden="true" className="text-base leading-none">{locale === "en" ? "\u{1F1F3}\u{1F1F1}" : "\u{1F1EC}\u{1F1E7}"}</span>
+            <span>{switchLanguageFlag}</span>
+          </Link>
+
+          <button
+            className={`inline-flex h-11 w-11 items-center justify-center rounded-full transition-colors ${
+              scrolled
+                ? "text-foreground hover:bg-surface-container"
+                : "text-white hover:bg-white/10"
+            }`}
+            onClick={() => setMobileOpen(!mobileOpen)}
+            aria-label={mobileOpen ? "Close menu" : "Open menu"}
+            aria-expanded={mobileOpen}
+          >
+            {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+        </div>
       </header>
 
       {/* Sidebar drawer */}
@@ -193,7 +211,7 @@ export default function Sidebar() {
             className="flex items-center gap-2 text-[11px] text-gray-400 hover:text-gray-600 transition-colors tracking-[0.1em] uppercase font-mono"
           >
             <GlobeIcon className="w-3.5 h-3.5" />
-            <span>{locale === "en" ? "Nederlands" : "English"}</span>
+            <span>{switchLanguageLabel}</span>
           </Link>
         </div>
       </aside>
