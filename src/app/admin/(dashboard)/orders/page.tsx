@@ -1,7 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { Eye, Package, RotateCcw, Trash2, X } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { Calendar, ChevronDown, Eye, MapPin, Package, RotateCcw, Search, Trash2, X } from "lucide-react";
+
+interface Location {
+  id: string;
+  name: string;
+}
 
 interface Order {
   id: string;
@@ -13,7 +18,7 @@ interface Order {
   notes: string | null;
   totalAmount: number;
   createdAt: string;
-  location: { name: string };
+  location: Location;
   pickupSlot: { date: string; time: string };
   items: { quantity: number; menuItem: { name: string } }[];
   molliePaymentId: string | null;
@@ -49,18 +54,29 @@ function check401(response: Response) {
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [locationFilter, setLocationFilter] = useState("ALL");
+  const [dateFilter, setDateFilter] = useState("");
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [receiptPreview, setReceiptPreview] = useState<ReceiptPreview | null>(null);
   const [receiptLoadingId, setReceiptLoadingId] = useState<string | null>(null);
 
   const fetchOrders = useCallback(async () => {
-    const res = await fetch("/api/admin/orders", { credentials: "include" });
-    if (check401(res)) return;
-    if (res.ok) {
-      const data = await res.json();
+    const [ordersResponse, locationsResponse] = await Promise.all([
+      fetch("/api/admin/orders", { credentials: "include" }),
+      fetch("/api/admin/locations", { credentials: "include" }),
+    ]);
+    if (check401(ordersResponse) || check401(locationsResponse)) return;
+    if (ordersResponse.ok) {
+      const data = await ordersResponse.json();
       setOrders(Array.isArray(data) ? data : []);
+    }
+    if (locationsResponse.ok) {
+      const data = await locationsResponse.json();
+      setLocations(Array.isArray(data) ? data : []);
     }
     setLoading(false);
   }, []);
@@ -127,7 +143,15 @@ export default function OrdersPage() {
     return acc;
   }, {} as Record<string, number>);
 
-  const filtered = activeFilter ? orders.filter((o) => o.status === activeFilter) : orders;
+  const filtered = useMemo(() => orders.filter((order) => {
+    const q = search.trim().toLowerCase();
+    const searchableText = `${order.customerName} ${order.customerPhone} ${order.customerEmail || ""}`.toLowerCase();
+    const matchesSearch = !q || searchableText.includes(q);
+    const matchesLocation = locationFilter === "ALL" || order.location.id === locationFilter;
+    const matchesStatus = !activeFilter || order.status === activeFilter;
+    const matchesDate = !dateFilter || order.pickupSlot.date.slice(0, 10) === dateFilter;
+    return matchesSearch && matchesLocation && matchesStatus && matchesDate;
+  }), [orders, search, locationFilter, activeFilter, dateFilter]);
 
   if (loading) return <div className="text-gray-400 p-6">Loading...</div>;
 
@@ -157,6 +181,59 @@ export default function OrdersPage() {
             </button>
           );
         })}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9CA3AF]" />
+          <input
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search by name, phone or email..."
+            aria-label="Search orders"
+            className="w-72 rounded-lg border border-[#DDD6CA] bg-white py-2 pl-9 pr-3 text-sm text-[#171717] placeholder-[#9CA3AF] focus:outline-none focus:border-[#B99516]"
+          />
+        </div>
+        <div className="relative">
+          <MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9CA3AF]" />
+          <select
+            value={locationFilter}
+            onChange={(event) => setLocationFilter(event.target.value)}
+            aria-label="Filter orders by location"
+            className="min-w-52 appearance-none rounded-lg border border-[#DDD6CA] bg-white py-2 pl-9 pr-9 text-sm text-[#171717] focus:outline-none focus:border-[#B99516]"
+          >
+            <option value="ALL">All locations</option>
+            {locations.map((location) => (
+              <option key={location.id} value={location.id}>{location.name}</option>
+            ))}
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#9CA3AF]" />
+        </div>
+        <div className="relative">
+          <select
+            value={activeFilter || "ALL"}
+            onChange={(event) => setActiveFilter(event.target.value === "ALL" ? null : event.target.value)}
+            aria-label="Filter orders by status"
+            className="appearance-none rounded-lg border border-[#DDD6CA] bg-white py-2 pl-3 pr-9 text-sm text-[#171717] focus:outline-none focus:border-[#B99516]"
+          >
+            <option value="ALL">All statuses</option>
+            {statusOrder.map((status) => (
+              <option key={status} value={status}>{statusConfig[status].label}</option>
+            ))}
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#9CA3AF]" />
+        </div>
+        <div className="relative">
+          <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9CA3AF]" />
+          <input
+            type="date"
+            value={dateFilter}
+            onChange={(event) => setDateFilter(event.target.value)}
+            aria-label="Filter orders by pickup date"
+            className="rounded-lg border border-[#DDD6CA] bg-white py-2 pl-9 pr-3 text-sm text-[#171717] focus:outline-none focus:border-[#B99516]"
+          />
+        </div>
       </div>
 
       <div className="bg-white border border-border-default rounded-xl overflow-hidden">
