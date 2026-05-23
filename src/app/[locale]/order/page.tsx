@@ -104,6 +104,7 @@ function getOrderCopy(locale: string) {
     open: isNl ? "Open" : "Open",
     openTodayUntil: isNl ? "Vandaag open tot" : "Open today until",
     openUntil: isNl ? "Open tot" : "Open until",
+    noPickupTimesToday: isNl ? "Er zijn vandaag geen afhaaltijden meer beschikbaar. Kies een andere dag." : "There are no pickup times left today. Choose another day.",
     pickupDay: isNl ? "Afhaaldag" : "Pickup day",
     pickupDate: isNl ? "Selecteer afhaaldatum" : "Select pickup date",
     recommended: isNl ? "Aanbevolen" : "Recommended",
@@ -181,6 +182,24 @@ function buildPickupTimeSlots(location: PickupLocation): TimeSlot[] {
   return slots;
 }
 
+function getAmsterdamNow() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Amsterdam",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date());
+  const part = (type: string) => parts.find((value) => value.type === type)?.value ?? "";
+
+  return {
+    date: `${part("year")}-${part("month")}-${part("day")}`,
+    minutes: Number(part("hour")) * 60 + Number(part("minute")),
+  };
+}
+
 function getPickupDay(dateValue: string, locale: string): PickupDay {
   const date = new Date(`${dateValue}T00:00:00`);
   const dateLocale = locale === "nl" ? "nl-NL" : "en-GB";
@@ -220,6 +239,7 @@ export default function OrderPickupPage() {
   const [locations, setLocations] = useState<PickupLocation[]>(pickupLocations);
   const [savingSelection, setSavingSelection] = useState(false);
   const [dayPickerOpen, setDayPickerOpen] = useState(false);
+  const [amsterdamNow, setAmsterdamNow] = useState<{ date: string; minutes: number } | null>(null);
   const menuHref = useMemo(() => `/${locale}/menu`, [locale]);
   const selectedLocation = useMemo(
     () => locations.find((location) => location.id === selectedLocationId) ?? locations[0] ?? pickupLocations[0],
@@ -250,9 +270,20 @@ export default function OrderPickupPage() {
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    const updateNow = () => setAmsterdamNow(getAmsterdamNow());
+    updateNow();
+    const intervalId = window.setInterval(updateNow, 60_000);
+    return () => window.clearInterval(intervalId);
+  }, []);
+
   const availableTimeSlots = useMemo(
-    () => buildPickupTimeSlots(selectedLocation),
-    [selectedLocation]
+    () => buildPickupTimeSlots(selectedLocation).filter((slot) => {
+      if (!amsterdamNow || selectedDate !== amsterdamNow.date) return true;
+      const minutes = parseTimeToMinutes(slot.time);
+      return minutes !== null && minutes > amsterdamNow.minutes;
+    }),
+    [selectedLocation, selectedDate, amsterdamNow]
   );
 
   useEffect(() => {
@@ -314,12 +345,12 @@ export default function OrderPickupPage() {
                 setDayPickerOpen(false);
               }}
             />
-            <ContinueToMenuCard onContinue={saveSelectionAndContinue} copy={copy} disabled={savingSelection} />
+            <ContinueToMenuCard onContinue={saveSelectionAndContinue} copy={copy} disabled={savingSelection || availableTimeSlots.length === 0} />
           </section>
         </div>
       </main>
       <ReassuranceBar items={copy.reassuranceItems} />
-      <MobileContinueBar onContinue={saveSelectionAndContinue} copy={copy} disabled={savingSelection} />
+      <MobileContinueBar onContinue={saveSelectionAndContinue} copy={copy} disabled={savingSelection || availableTimeSlots.length === 0} />
     </div>
   );
 }
@@ -505,6 +536,11 @@ function TimeSlotSelector({
         {copy.choosePickupTime}
       </h2>
       <div className="-mx-5 overflow-x-auto px-5 pb-2 sm:mx-0 sm:px-0">
+        {slots.length === 0 ? (
+          <p className="rounded-2xl border border-[#E8E4DF] bg-white px-5 py-4 text-sm font-medium text-[#6B6B6B]">
+            {copy.noPickupTimesToday}
+          </p>
+        ) : (
         <div className="flex min-w-max items-stretch gap-3">
           {slots.map((slot) => {
             const selected = selectedTime === slot.time;
@@ -536,6 +572,7 @@ function TimeSlotSelector({
             );
           })}
         </div>
+        )}
       </div>
     </section>
   );
