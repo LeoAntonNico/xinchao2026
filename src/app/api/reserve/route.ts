@@ -150,6 +150,7 @@ export async function POST(req: Request) {
         restaurantAddress: location.address,
         restaurantEmail: location.email ?? "hello@xinchao.nl",
         restaurantPhone: location.phone,
+        notes,
       }).catch(console.error);
     }
 
@@ -215,6 +216,7 @@ export async function PATCH(req: Request) {
         restaurantAddress: location.address,
         restaurantEmail: location.email ?? "hello@xinchao.nl",
         restaurantPhone: location.phone,
+        notes,
       }).catch(console.error);
     }
 

@@ -425,6 +425,7 @@ export async function sendReservationEmail(args: {
   restaurantAddress?: string;
   restaurantEmail?: string;
   restaurantPhone: string;
+  notes?: string | null;
 }) {
   const {
     to,
@@ -438,6 +439,7 @@ export async function sendReservationEmail(args: {
     restaurantAddress,
     restaurantEmail,
     restaurantPhone,
+    notes,
   } = args;
   const baseUrl = (process.env.NEXT_PUBLIC_BASE_URL || "https://xinchao.nl").replace(/\/$/, "");
   const logoUrl = `${baseUrl}/images/logo.png`;
@@ -449,6 +451,7 @@ export async function sendReservationEmail(args: {
   const addressParts = splitAddress(address);
   const shownEmail = restaurantEmail || "hello@xinchao.nl";
   const shownPhone = restaurantPhone || (locationSlug === "utrecht" ? "+31 30 785 7092" : "+31 317 225 008");
+  const specialRequest = notes?.trim() || "";
   const calendarUrl = buildCalendarUrl({ customerName, partySize, date, time, location });
   const editUrl = reservationId
     ? `${baseUrl}/nl/reserve?edit=${encodeURIComponent(reservationId)}&token=${encodeURIComponent(createReservationEditToken(reservationId))}`
@@ -464,6 +467,7 @@ Tijd: ${time}
 Gasten: ${partySize}
 Naam gast: ${customerName}
 Reserveringsnummer: ${code}
+${specialRequest ? `Speciale verzoeken: ${specialRequest}\n` : ""}
 
 Wil je iets wijzigen? Bel ons op ${shownPhone}.
 
@@ -549,6 +553,19 @@ Xin Chao Vietnamese Restaurant
                 </table>
               </td>
             </tr>
+            ${specialRequest ? `
+            <tr>
+              <td style="padding:0 30px 16px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #F1DFC0;border-radius:12px;background:#FFF9EF;overflow:hidden;">
+                  <tr>
+                    <td style="padding:18px 22px;">
+                      <div style="font-size:14px;line-height:1.4;color:#6B7280;margin-bottom:7px;">&#9998;&nbsp; Speciale verzoeken</div>
+                      <div style="font-size:16px;line-height:1.55;font-weight:700;color:#141414;">${escapeHtml(specialRequest).replace(/\n/g, "<br>")}</div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>` : ""}
             <tr>
               <td style="padding:0 30px 14px;">
                 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #E8E4DF;border-radius:12px;box-shadow:0 10px 26px rgba(20,20,20,0.06);overflow:hidden;">
