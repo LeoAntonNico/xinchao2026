@@ -731,7 +731,7 @@ function ReservationConfirmation({
         <div className="mt-5 flex flex-col gap-3 rounded-xl border border-gray-200 bg-white px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3 text-sm text-gray-600">
             <Info className="mt-0.5 h-5 w-5 shrink-0 text-gray-400" aria-hidden="true" />
-            <p>{isNl ? "Ben je later? We houden je tafel 15 minuten vast." : "Running late? We hold your table for 15 minutes."}</p>
+            <p>{isNl ? "Ben je later? We houden je tafel 10 minuten vast." : "Running late? We hold your table for 10 minutes."}</p>
           </div>
           {reservation.location.phone && (
             <a

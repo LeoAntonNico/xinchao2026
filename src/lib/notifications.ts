@@ -622,7 +622,7 @@ Xin Chao Vietnamese Restaurant
                         </tr>
                         <tr>
                           <td width="50%" style="font-size:14px;line-height:1.7;color:#4B5563;padding:5px 18px 5px 0;">&#128276;&nbsp; Kun je niet komen? Laat het ons op tijd weten.</td>
-                          <td width="50%" style="font-size:14px;line-height:1.7;color:#4B5563;padding:5px 0 5px 18px;">&#9201;&nbsp; Je tafel wordt 15 minuten vastgehouden na de gereserveerde tijd.</td>
+                          <td width="50%" style="font-size:14px;line-height:1.7;color:#4B5563;padding:5px 0 5px 18px;">&#9201;&nbsp; Je tafel wordt 10 minuten vastgehouden na de gereserveerde tijd.</td>
                         </tr>
                       </table>
                     </td>
