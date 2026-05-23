@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer";
 import { cleanExclusionLabel } from "@/lib/cart-display";
+import { createReservationEditToken } from "@/lib/reservation-edit-token";
 
 const smtpHost = process.env.SMTP_HOST ?? "smtp.transip.email";
 const smtpPort = parseInt(process.env.SMTP_PORT ?? "587", 10);
@@ -23,6 +24,7 @@ const transporter = nodemailer.createTransport({
 
 async function sendEmail(args: {
   to: string | string[];
+  bcc?: string | string[];
   subject: string;
   text: string;
   html?: string;
@@ -36,6 +38,7 @@ async function sendEmail(args: {
     const info = await transporter.sendMail({
       from: formattedEmailFrom,
       to: args.to,
+      bcc: args.bcc,
       subject: args.subject,
       text: args.text,
       html: args.html,
@@ -115,6 +118,13 @@ function splitAddress(address: string) {
 
 function reservationLocationImage(slug?: string) {
   return slug === "utrecht" ? "/images/utrecht-exterior.jpg" : "/images/wageningen-exterior.jpg";
+}
+
+function reservationCopyEmail(locationSlug?: string, locationName?: string) {
+  const locationKey = `${locationSlug || ""} ${locationName || ""}`.toLowerCase();
+  if (locationKey.includes("utrecht")) return "utrecht@xinchao.nl";
+  if (locationKey.includes("wageningen")) return "wageningen@xinchao.nl";
+  return undefined;
 }
 
 function buildCalendarUrl(args: {
@@ -433,7 +443,9 @@ export async function sendReservationEmail(args: {
   const shownEmail = restaurantEmail || "hello@xinchao.nl";
   const shownPhone = restaurantPhone || (locationSlug === "utrecht" ? "+31 30 785 7092" : "+31 317 225 008");
   const calendarUrl = buildCalendarUrl({ customerName, partySize, date, time, location });
-  const editUrl = `${baseUrl}/nl/reserve`;
+  const editUrl = reservationId
+    ? `${baseUrl}/nl/reserve?edit=${encodeURIComponent(reservationId)}&token=${encodeURIComponent(createReservationEditToken(reservationId))}`
+    : `${baseUrl}/nl/reserve`;
   const cancelUrl = `mailto:${shownEmail}?subject=${encodeURIComponent(`Reservering annuleren - ${code}`)}`;
   const routeUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${location} ${address}`)}`;
   const body = `Hi ${customerName},
@@ -614,6 +626,7 @@ Xin Chao Vietnamese Restaurant
 
   await sendEmail({
     to,
+    bcc: reservationCopyEmail(locationSlug, location),
     subject: `Je reservering bij ${location} is bevestigd`,
     text: body,
     html,

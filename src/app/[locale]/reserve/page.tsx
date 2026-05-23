@@ -27,6 +27,7 @@ interface Availability {
 
 interface ConfirmedReservation {
   id: string;
+  editToken?: string;
   name: string;
   phone: string;
   email: string;
@@ -112,12 +113,51 @@ export default function ReservePage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
   const [confirmedReservation, setConfirmedReservation] = useState<ConfirmedReservation | null>(null);
+  const [editingReservationId, setEditingReservationId] = useState<string | null>(null);
+  const [editToken, setEditToken] = useState<string | null>(null);
+  const [loadingEditReservation, setLoadingEditReservation] = useState(false);
 
   useEffect(() => {
     fetch("/api/locations")
       .then((r) => r.json())
       .then((d) => setLocations(d));
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const reservationId = params.get("edit");
+    const token = params.get("token");
+    if (!reservationId || !token) return;
+
+    setLoadingEditReservation(true);
+    fetch(`/api/reserve?id=${encodeURIComponent(reservationId)}&token=${encodeURIComponent(token)}`)
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Reservation could not be loaded.");
+        setEditingReservationId(reservationId);
+        setEditToken(token);
+        setForm({
+          name: data.name,
+          phone: data.phone,
+          email: data.email,
+          locationId: data.location.id,
+          date: data.date,
+          time: data.time,
+          partySize: data.partySize,
+          notes: data.notes,
+        });
+      })
+      .catch((error: Error) => {
+        setMessage({
+          type: "error",
+          text: isNl
+            ? "Deze wijzigingslink is niet meer geldig. Neem contact met ons op."
+            : "This edit link is no longer valid. Please contact us.",
+        });
+        console.error(error);
+      })
+      .finally(() => setLoadingEditReservation(false));
+  }, [isNl]);
 
   useEffect(() => {
     if (!form.locationId || !form.date) {
@@ -184,9 +224,9 @@ export default function ReservePage() {
     setLoading(true);
 
     const res = await fetch("/api/reserve", {
-      method: "POST",
+      method: editingReservationId ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
+      body: JSON.stringify(editingReservationId ? { ...form, id: editingReservationId, token: editToken } : form),
     });
     const data = await res.json();
     setLoading(false);
@@ -196,6 +236,7 @@ export default function ReservePage() {
       if (confirmedLocation) {
         setConfirmedReservation({
           id: data.id,
+          editToken: data.editToken,
           name: form.name,
           phone: form.phone,
           email: form.email,
@@ -208,6 +249,8 @@ export default function ReservePage() {
       }
       setForm({ name: "", phone: "", email: "", locationId: "", date: "", time: "", partySize: 2, notes: "" });
       setAvail(null);
+      setEditingReservationId(null);
+      setEditToken(null);
     } else {
       setMessage({
         text: data.error || (isNl ? "Kon reservering niet maken." : "Could not create reservation."),
@@ -233,6 +276,8 @@ export default function ReservePage() {
             partySize: confirmedReservation.partySize,
             notes: confirmedReservation.notes,
           });
+          setEditingReservationId(confirmedReservation.id);
+          setEditToken(confirmedReservation.editToken || null);
           setConfirmedReservation(null);
         }}
       />
@@ -265,6 +310,15 @@ export default function ReservePage() {
             {message.type === "success" ? <CheckCircle className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
             {message.text}
           </div>
+        </div>
+      )}
+
+      {editingReservationId && !confirmedReservation && (
+        <div className="mb-8 border-l-[4px] border-logo-red bg-logo-red/10 px-4 py-3 text-sm text-foreground">
+          <p className="font-bold">{isNl ? "Je wijzigt je bestaande reservering." : "You are editing your existing reservation."}</p>
+          <p className="mt-1 text-gray-600">
+            {isNl ? "Controleer je gegevens en sla je wijzigingen op." : "Review your details and save your changes."}
+          </p>
         </div>
       )}
 
@@ -490,13 +544,15 @@ export default function ReservePage() {
             {/* ── Submit ── */}
             <button
               type="submit"
-              disabled={loading || !form.time}
+              disabled={loading || loadingEditReservation || !form.time}
               className="w-full py-5 bg-logo-red text-white font-bold text-[15px] tracking-[0.06em] uppercase hover:bg-logo-red-hover transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-3"
             >
               {loading
                 ? (isNl ? "Bezig..." : "Processing...")
                 : <>
-                    {isNl ? "Bevestig Reservering" : "Confirm Reservation"}
+                    {editingReservationId
+                      ? (isNl ? "Wijzigingen opslaan" : "Save changes")
+                      : (isNl ? "Bevestig Reservering" : "Confirm Reservation")}
                     <ArrowRight className="w-5 h-5" />
                   </>}
             </button>
