@@ -417,6 +417,7 @@ export async function sendReservationEmail(args: {
   to: string;
   reservationId?: string;
   customerName: string;
+  customerPhone: string;
   partySize: number;
   date: string;
   time: string;
@@ -431,6 +432,7 @@ export async function sendReservationEmail(args: {
     to,
     reservationId,
     customerName,
+    customerPhone,
     partySize,
     date,
     time,
@@ -466,6 +468,7 @@ Datum: ${displayDate}
 Tijd: ${time}
 Gasten: ${partySize}
 Naam gast: ${customerName}
+Contact: ${customerPhone}
 Reserveringsnummer: ${code}
 ${specialRequest ? `Speciale verzoeken: ${specialRequest}\n` : ""}
 
@@ -546,8 +549,8 @@ Xin Chao Vietnamese Restaurant
                       <div style="margin-top:7px;font-size:18px;font-weight:900;color:#141414;">${escapeHtml(location)}</div>
                     </td>
                     <td width="33.33%" style="padding:20px 18px;">
-                      <div style="font-size:14px;color:#6B7280;">&#127869;&nbsp; Type</div>
-                      <div style="margin-top:7px;font-size:18px;font-weight:900;color:#141414;">Tafelreservering</div>
+                      <div style="font-size:14px;color:#6B7280;">&#128222;&nbsp; Contact</div>
+                      <div style="margin-top:7px;font-size:18px;font-weight:900;color:#141414;">${escapeHtml(customerPhone)}</div>
                     </td>
                   </tr>
                 </table>
