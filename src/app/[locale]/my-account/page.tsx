@@ -104,7 +104,6 @@ function AccountAuthPanel({
   error,
   loading,
   onSubmit,
-  onSocialAuth,
 }: {
   locale: string;
   mode: "login" | "register";
@@ -120,7 +119,6 @@ function AccountAuthPanel({
   error: string;
   loading: boolean;
   onSubmit: (event: React.FormEvent) => void;
-  onSocialAuth: (provider: "Google" | "Apple") => void;
 }) {
   const isNl = locale === "nl";
   const isRegister = mode === "register";
@@ -165,32 +163,7 @@ function AccountAuthPanel({
             </button>
           </div>
 
-          <div className="space-y-3 px-6 pt-5">
-            <button
-              type="button"
-              onClick={() => onSocialAuth("Google")}
-              className="flex min-h-12 w-full items-center justify-center gap-3 rounded-2xl border border-[#E5E1DA] bg-white px-4 text-sm font-bold text-[#171717] transition hover:border-[#171717] focus:outline-none focus:ring-2 focus:ring-[#E31B23]/25"
-            >
-              <span className="flex h-6 w-6 items-center justify-center rounded-full border border-[#E5E1DA] text-xs font-extrabold text-[#4285F4]">G</span>
-              {isNl ? "Doorgaan met Google" : "Continue with Google"}
-            </button>
-            <button
-              type="button"
-              onClick={() => onSocialAuth("Apple")}
-              className="flex min-h-12 w-full items-center justify-center gap-3 rounded-2xl border border-[#171717] bg-[#171717] px-4 text-sm font-bold text-white transition hover:bg-black focus:outline-none focus:ring-2 focus:ring-[#E31B23]/25"
-            >
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white text-xs font-extrabold text-[#171717]">A</span>
-              {isNl ? "Doorgaan met Apple" : "Continue with Apple"}
-            </button>
-          </div>
-
-          <div className="mx-6 my-5 flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.16em] text-[#A3A3A3]">
-            <span className="h-px flex-1 bg-[#E5E1DA]" />
-            {isNl ? "of met e-mail" : "or use email"}
-            <span className="h-px flex-1 bg-[#E5E1DA]" />
-          </div>
-
-          <form onSubmit={onSubmit} className="space-y-4 px-6 pb-7">
+          <form onSubmit={onSubmit} className="space-y-4 px-6 pb-7 pt-6">
             {isRegister && (
               <label className="block">
                 <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.12em] text-[#737373]">{isNl ? "Naam" : "Name"}</span>
@@ -385,14 +358,6 @@ export default function MyAccountPage() {
     }
   };
 
-  const handleSocialAuth = (provider: "Google" | "Apple") => {
-    setAuthError(
-      isNl
-        ? `${provider} inloggen moet nog worden gekoppeld in de betaalomgeving. Gebruik nu e-mail en wachtwoord.`
-        : `${provider} sign-in still needs to be connected. Please use email and password for now.`
-    );
-  };
-
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaveError("");
@@ -454,7 +419,6 @@ export default function MyAccountPage() {
         error={authError || error}
         loading={authLoading}
         onSubmit={handleAuthSubmit}
-        onSocialAuth={handleSocialAuth}
       />
     );
   }
@@ -476,7 +440,6 @@ export default function MyAccountPage() {
         error={authError}
         loading={authLoading}
         onSubmit={handleAuthSubmit}
-        onSocialAuth={handleSocialAuth}
       />
     );
   }
