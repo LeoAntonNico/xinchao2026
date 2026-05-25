@@ -24,6 +24,8 @@ interface Reservation {
   location?: Location;
 }
 
+type DateScope = "TODAY" | "UPCOMING" | "PAST";
+
 const PAGE_SIZE = 10;
 
 const statusConfig: Record<string, { label: string; bg: string; text: string; border: string }> = {
@@ -64,7 +66,9 @@ export default function ReservationsPage() {
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [locationFilter, setLocationFilter] = useState("ALL");
   const [dateFilter, setDateFilter] = useState("");
+  const [dateScope, setDateScope] = useState<DateScope>("TODAY");
   const [currentPage, setCurrentPage] = useState(1);
+  const todayKey = format(new Date(), "yyyy-MM-dd");
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -95,18 +99,37 @@ export default function ReservationsPage() {
     return { todayCount, weekCount, confirmedCount, seatedCount };
   }, [items]);
 
+  const dateScopeCounts = useMemo(() => {
+    return items.reduce(
+      (counts, reservation) => {
+        const reservationDate = reservation.date.slice(0, 10);
+        if (reservationDate === todayKey) counts.TODAY += 1;
+        if (reservationDate > todayKey) counts.UPCOMING += 1;
+        if (reservationDate < todayKey) counts.PAST += 1;
+        return counts;
+      },
+      { TODAY: 0, UPCOMING: 0, PAST: 0 }
+    );
+  }, [items, todayKey]);
+
   // Filtered items
   const filtered = useMemo(() => {
     return items.filter((r) => {
+      const reservationDate = r.date.slice(0, 10);
       const q = search.toLowerCase().trim();
       const text = `${r.customerName} ${r.customerPhone} ${r.customerEmail || ""}`.toLowerCase();
       const matchSearch = !q || text.includes(q);
       const matchStatus = statusFilter === "ALL" || r.status === statusFilter;
       const matchLocation = locationFilter === "ALL" || r.locationId === locationFilter;
-      const matchDate = !dateFilter || r.date.slice(0, 10) === dateFilter;
-      return matchSearch && matchStatus && matchLocation && matchDate;
+      const matchDate = !dateFilter || reservationDate === dateFilter;
+      const matchScope = dateScope === "TODAY"
+        ? reservationDate === todayKey
+        : dateScope === "UPCOMING"
+          ? reservationDate > todayKey
+          : reservationDate < todayKey;
+      return matchSearch && matchStatus && matchLocation && matchDate && matchScope;
     });
-  }, [items, search, statusFilter, locationFilter, dateFilter]);
+  }, [items, search, statusFilter, locationFilter, dateFilter, dateScope, todayKey]);
 
   // Group by date
   const grouped = useMemo(() => {
@@ -120,7 +143,10 @@ export default function ReservationsPage() {
     return g;
   }, [filtered]);
 
-  const sortedDates = useMemo(() => Object.keys(grouped).sort(), [grouped]);
+  const sortedDates = useMemo(() => {
+    const dates = Object.keys(grouped).sort();
+    return dateScope === "PAST" ? dates.reverse() : dates;
+  }, [grouped, dateScope]);
 
   // Flatten for pagination across groups
   const flatRows = useMemo(() => {
@@ -137,7 +163,21 @@ export default function ReservationsPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, statusFilter, locationFilter, dateFilter]);
+  }, [search, statusFilter, locationFilter, dateFilter, dateScope]);
+
+  function selectDateScope(scope: DateScope) {
+    setDateScope(scope);
+    setDateFilter("");
+  }
+
+  function selectDate(date: string) {
+    setDateFilter(date);
+    if (!date || date === todayKey) {
+      setDateScope("TODAY");
+    } else {
+      setDateScope(date > todayKey ? "UPCOMING" : "PAST");
+    }
+  }
 
   function handleEdit(item: Reservation) {
     setEditingItem(item);
@@ -284,6 +324,31 @@ export default function ReservationsPage() {
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center rounded-lg border border-[#DDD6CA] bg-white p-1" role="tablist" aria-label="Reservation date range">
+          {([
+            { id: "TODAY", label: "Today" },
+            { id: "UPCOMING", label: "Upcoming" },
+            { id: "PAST", label: "Past" },
+          ] as const).map(({ id, label }) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={dateScope === id}
+              onClick={() => selectDateScope(id)}
+              className={`min-h-10 rounded-md px-4 text-sm font-medium transition-colors ${
+                dateScope === id
+                  ? "bg-[#E31B23] text-white"
+                  : "text-[#6B7280] hover:bg-[#FAF7F1] hover:text-[#171717]"
+              }`}
+            >
+              {label}
+              <span className={`ml-2 text-xs ${dateScope === id ? "text-white/80" : "text-[#9CA3AF]"}`}>
+                {dateScopeCounts[id]}
+              </span>
+            </button>
+          ))}
+        </div>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9CA3AF]" />
           <input
@@ -327,7 +392,7 @@ export default function ReservationsPage() {
           <input
             type="date"
             value={dateFilter}
-            onChange={(e) => setDateFilter(e.target.value)}
+            onChange={(e) => selectDate(e.target.value)}
             className="bg-white border border-[#DDD6CA] rounded-lg pl-9 pr-3 py-2 text-sm text-[#171717] focus:outline-none focus:border-[#B99516] cursor-pointer"
           />
         </div>
@@ -339,6 +404,19 @@ export default function ReservationsPage() {
           Export
         </button>
       </div>
+
+      {dateScope !== "PAST" && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#E8E2D6] bg-[#FAF7F1] px-4 py-3 text-sm text-[#6B7280]">
+          <span>Past days are hidden to keep today&apos;s service focused.</span>
+          <button
+            type="button"
+            onClick={() => selectDateScope("PAST")}
+            className="font-medium text-[#E31B23] transition-colors hover:text-[#B9141B]"
+          >
+            View past reservations
+          </button>
+        </div>
+      )}
 
       {/* Table */}
       {sortedDates.length === 0 ? (
