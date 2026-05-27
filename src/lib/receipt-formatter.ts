@@ -268,6 +268,7 @@ export function buildReceiptFromOrder(
     day: "numeric",
     month: "short",
     year: "numeric",
+    timeZone: "Europe/Amsterdam",
   });
   const parsedAddress = parseLocationAddress(location.address, location.name);
 
@@ -302,6 +303,7 @@ export function buildReceiptFromOrder(
       hour: "2-digit",
       minute: "2-digit",
       second: "2-digit",
+      timeZone: "Europe/Amsterdam",
     }),
     pickupTime: pickupTime || "ASAP",
     items,
