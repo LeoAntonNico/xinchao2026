@@ -53,6 +53,34 @@ function getTodayInputValue() {
   return `${year}-${month}-${day}`;
 }
 
+const phoneCountries = [
+  { code: "NL", prefix: "+31", label: "Netherlands" },
+  { code: "BE", prefix: "+32", label: "Belgium" },
+  { code: "DE", prefix: "+49", label: "Germany" },
+  { code: "FR", prefix: "+33", label: "France" },
+  { code: "GB", prefix: "+44", label: "United Kingdom" },
+  { code: "US", prefix: "+1", label: "United States" },
+  { code: "ES", prefix: "+34", label: "Spain" },
+  { code: "IT", prefix: "+39", label: "Italy" },
+];
+
+function splitStoredPhone(value: string) {
+  const compact = value.trim();
+  const country = phoneCountries.find((candidate) => compact.startsWith(candidate.prefix));
+  if (!country) return { prefix: "+31", number: compact };
+  return {
+    prefix: country.prefix,
+    number: compact.slice(country.prefix.length).trim(),
+  };
+}
+
+function fullPhoneNumber(prefix: string, number: string) {
+  const trimmed = number.trim();
+  if (!trimmed) return "";
+  if (trimmed.startsWith("+")) return trimmed;
+  return `${prefix} ${trimmed}`;
+}
+
 interface Customer {
   id: string;
   name: string;
@@ -100,7 +128,11 @@ export default function CheckoutPage() {
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [phonePrefix, setPhonePrefix] = useState("+31");
   const [email, setEmail] = useState("");
+  const [streetAddress, setStreetAddress] = useState("");
+  const [postalCode, setPostalCode] = useState("");
+  const [city, setCity] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [saveDetails, setSaveDetails] = useState(false);
@@ -189,7 +221,9 @@ export default function CheckoutPage() {
             setCustomer(data);
             setName(data.name || "");
             setEmail(data.email || "");
-            setPhone(data.phone || "");
+            const parsedPhone = splitStoredPhone(data.phone || "");
+            setPhonePrefix(parsedPhone.prefix);
+            setPhone(parsedPhone.number);
           }
         })
         .catch(() => {})
@@ -201,8 +235,15 @@ export default function CheckoutPage() {
           try {
             const data = JSON.parse(saved);
             if (data.name) setName(data.name);
-            if (data.phone) setPhone(data.phone);
+            if (data.phone) {
+              const parsedPhone = splitStoredPhone(data.phone);
+              setPhonePrefix(parsedPhone.prefix);
+              setPhone(parsedPhone.number);
+            }
             if (data.email) setEmail(data.email);
+            if (data.streetAddress) setStreetAddress(data.streetAddress);
+            if (data.postalCode) setPostalCode(data.postalCode);
+            if (data.city) setCity(data.city);
             setSaveDetails(true);
           } catch {}
         }
@@ -287,15 +328,21 @@ export default function CheckoutPage() {
     setLoading(true);
     setError("");
     try {
+      const submittedPhone = fullPhoneNumber(phonePrefix, phone);
+      const customerAddressLines = [
+        streetAddress.trim() ? `Adres: ${streetAddress.trim()}` : "",
+        postalCode.trim() || city.trim() ? `Postcode/plaats: ${[postalCode.trim(), city.trim()].filter(Boolean).join(" ")}` : "",
+      ].filter(Boolean);
+
       if (!customer && email && password) {
         await fetch("/api/customer/register", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name, email, phone, password }),
+          body: JSON.stringify({ name, email, phone: submittedPhone, password }),
         }).catch(() => {});
       }
       if (!customer && saveDetails && typeof window !== "undefined") {
-        localStorage.setItem("xinchao_customer", JSON.stringify({ name, phone, email }));
+        localStorage.setItem("xinchao_customer", JSON.stringify({ name, phone: submittedPhone, email, streetAddress, postalCode, city }));
       }
       const res = await fetch("/api/order", {
         method: "POST",
@@ -318,9 +365,9 @@ export default function CheckoutPage() {
           pickupDate: checkoutPickupDate,
           pickupTime: checkoutPickupTime,
           name,
-          phone,
+          phone: submittedPhone,
           email,
-          notes: "",
+          notes: customerAddressLines.join("\n"),
           customerId: customer?.id,
         }),
       });
@@ -357,7 +404,9 @@ export default function CheckoutPage() {
         setCustomer(data.customer);
         setName(data.customer.name || "");
         setEmail(data.customer.email || "");
-        setPhone(data.customer.phone || "");
+        const parsedPhone = splitStoredPhone(data.customer.phone || "");
+        setPhonePrefix(parsedPhone.prefix);
+        setPhone(parsedPhone.number);
         setSignInOpen(false);
       }
     } catch (err: unknown) {
@@ -374,6 +423,7 @@ export default function CheckoutPage() {
     setName("");
     setEmail("");
     setPhone("");
+    setPhonePrefix("+31");
     setEditMode(false);
   };
 
@@ -535,12 +585,61 @@ export default function CheckoutPage() {
                 <div className="space-y-1.5">
                   <label className="text-xs text-on-surface-variant uppercase tracking-wider font-medium">{isNl ? "Telefoonnummer" : "Phone Number"}</label>
                   <div className="flex">
-                    <div className="shrink-0 inline-flex items-center gap-2 px-3 py-3 bg-surface border border-r-0 border-default rounded-l-xl text-sm text-foreground">
-                      <span className="text-base">NL</span>
-                      <span className="text-xs text-[#737373]">+31</span>
-                      <svg className="w-3 h-3 text-[#737373]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9" /></svg>
-                    </div>
+                    <label className="sr-only" htmlFor="checkout-phone-prefix">
+                      {isNl ? "Landcode" : "Country code"}
+                    </label>
+                    <select
+                      id="checkout-phone-prefix"
+                      value={phonePrefix}
+                      onChange={(e) => setPhonePrefix(e.target.value)}
+                      disabled={fieldsDisabled}
+                      className="shrink-0 w-[112px] rounded-l-xl border border-r-0 border-default bg-surface px-3 py-3 text-sm text-foreground focus:border-brand-red focus:outline-none disabled:bg-[#F0EDE6] disabled:text-[#737373]"
+                    >
+                      {phoneCountries.map((country) => (
+                        <option key={country.prefix} value={country.prefix}>
+                          {country.code} {country.prefix}
+                        </option>
+                      ))}
+                    </select>
                     <input ref={phoneInputRef} required value={phone} onChange={(e) => setPhone(e.target.value)} disabled={fieldsDisabled} placeholder={isNl ? "Je telefoonnummer" : "Your phone number"} aria-invalid={!!error && !phone.trim()} className="flex-1 min-w-0 px-4 py-3 bg-surface-container border border-default text-foreground text-sm placeholder:text-stone-gray focus:border-brand-red focus:outline-none transition-colors rounded-r-xl disabled:bg-[#F0EDE6] disabled:text-[#737373]" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <label className="text-xs text-on-surface-variant uppercase tracking-wider font-medium">
+                      {isNl ? "Adres + huisnummer" : "Address + house number"}
+                    </label>
+                    <input
+                      value={streetAddress}
+                      onChange={(e) => setStreetAddress(e.target.value)}
+                      placeholder={isNl ? "Straatnaam 12" : "Street name 12"}
+                      className="w-full px-4 py-3 bg-surface-container border border-default text-foreground text-sm placeholder:text-stone-gray focus:border-brand-red focus:outline-none transition-colors rounded-xl"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs text-on-surface-variant uppercase tracking-wider font-medium">
+                      {isNl ? "Postcode" : "Postal code"}
+                    </label>
+                    <input
+                      value={postalCode}
+                      onChange={(e) => setPostalCode(e.target.value)}
+                      placeholder={isNl ? "1234 AB" : "1234 AB"}
+                      autoComplete="postal-code"
+                      className="w-full px-4 py-3 bg-surface-container border border-default text-foreground text-sm placeholder:text-stone-gray focus:border-brand-red focus:outline-none transition-colors rounded-xl"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs text-on-surface-variant uppercase tracking-wider font-medium">
+                      {isNl ? "Woonplaats" : "City"}
+                    </label>
+                    <input
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      placeholder={isNl ? "Wageningen" : "City"}
+                      autoComplete="address-level2"
+                      className="w-full px-4 py-3 bg-surface-container border border-default text-foreground text-sm placeholder:text-stone-gray focus:border-brand-red focus:outline-none transition-colors rounded-xl"
+                    />
                   </div>
                 </div>
 
