@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getPayment } from "@/lib/mollie";
 import { sendOrderPaidEmail } from "@/lib/notifications";
 import { ensurePrintJobForOrder } from "@/lib/print-jobs";
+import { ensurePickupSlotAfterPayment } from "@/lib/pickup-time";
 
 export async function POST(req: Request) {
   try {
@@ -45,13 +46,19 @@ export async function POST(req: Request) {
 
     // Update order based on payment status
     if (status === "paid") {
+      const paidAt = new Date();
       await prisma.order.update({
         where: { id: order.id },
-        data: { status: "COMPLETED", paidAt: new Date() },
+        data: { status: "COMPLETED", paidAt },
       });
+      const pickupAdjustment = await ensurePickupSlotAfterPayment(order.id, paidAt);
+      const confirmedPickupSlot = pickupAdjustment?.pickupSlot ?? order.pickupSlot;
+      if (pickupAdjustment?.changed) {
+        console.log("[Mollie Webhook] Pickup time adjusted:", confirmedPickupSlot.time);
+      }
 
       // Send confirmation email
-      if (order.customerEmail && order.location && order.pickupSlot) {
+      if (order.customerEmail && order.location && confirmedPickupSlot) {
         await sendOrderPaidEmail({
           to: order.customerEmail,
           orderId: order.id,
@@ -68,8 +75,8 @@ export async function POST(req: Request) {
           })),
           location: order.location.name,
           locationSlug: order.location.slug,
-          pickupDate: new Date(order.pickupSlot.date).toLocaleDateString("en-GB"),
-          pickupTime: order.pickupSlot.time,
+          pickupDate: new Date(confirmedPickupSlot.date).toLocaleDateString("en-GB"),
+          pickupTime: confirmedPickupSlot.time,
         }).catch((err) => console.error("[Mollie Webhook] Email failed:", err));
       }
 

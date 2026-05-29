@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getPayment } from "@/lib/mollie";
 import { ensurePrintJobForOrder } from "@/lib/print-jobs";
+import { ensurePickupSlotAfterPayment } from "@/lib/pickup-time";
 
 export async function GET(req: NextRequest) {
   const orderId = req.nextUrl.searchParams.get("orderId");
@@ -27,11 +28,16 @@ export async function GET(req: NextRequest) {
     try {
       const payment = await getPayment(order.molliePaymentId);
       if (payment.status === "paid") {
+        const paidAt = new Date();
         await prisma.order.update({
           where: { id: order.id },
-          data: { status: "COMPLETED", paidAt: new Date() },
+          data: { status: "COMPLETED", paidAt },
         });
         order.status = "COMPLETED";
+        const pickupAdjustment = await ensurePickupSlotAfterPayment(order.id, paidAt);
+        if (pickupAdjustment?.pickupSlot) {
+          order.pickupSlot = pickupAdjustment.pickupSlot;
+        }
       } else if (["canceled", "expired", "failed"].includes(payment.status)) {
         await prisma.order.update({
           where: { id: order.id },
