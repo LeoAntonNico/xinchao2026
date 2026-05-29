@@ -1,4 +1,4 @@
-﻿-- CreateTable
+-- CreateTable
 CREATE TABLE "ProductPlasticSurcharge" (
     "id" TEXT NOT NULL,
     "amount" INTEGER NOT NULL DEFAULT 0,
