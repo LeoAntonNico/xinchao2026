@@ -7,6 +7,7 @@ import Image from "next/image";
 import { useState } from "react";
 import { calculateStatus } from "@/lib/status";
 import { track } from "@/lib/analytics";
+import { setStoredSelectedLocationId } from "@/lib/location-state";
 
 interface Props {
   id: string;
@@ -127,7 +128,16 @@ export default function LocationCard({
         <div className="grid grid-cols-2 gap-2 mb-2">
           <Link
             href={`/${locale}/order?location=${encodeURIComponent(slug)}`}
-            onClick={(e) => { e.stopPropagation(); track({ event: "order_clicked", locationId: id, locationName: name, locale }); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              setStoredSelectedLocationId(id);
+              try {
+                sessionStorage.setItem("order_locationId", id);
+                sessionStorage.setItem("order_locationSlug", slug);
+                sessionStorage.setItem("order_locationName", name);
+              } catch { /* ignore */ }
+              track({ event: "order_clicked", locationId: id, locationName: name, locale });
+            }}
             className={`flex items-center justify-center gap-1 px-2 py-2 ${accent.bg} text-white text-[12px] font-bold rounded-lg ${accent.hover} transition-colors`}
           >
             {orderLabel}

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useLocale } from "next-intl";
 import { MapPin, ArrowRight } from "lucide-react";
 import { useSelectedLocation } from "@/lib/location-state";
+import { setStoredSelectedLocationId } from "@/lib/location-state";
 import { useCart } from "@/components/CartContext";
 import { track } from "@/lib/analytics";
 import { calculateStatus } from "@/lib/status";
@@ -117,8 +118,16 @@ function StickyOrderBtn({ loc, locale, isNl, cartCount }: { loc: LocationInfo; l
 
   return (
     <Link
-      href={`/${locale}/order`}
-      onClick={() => track({ event: "sticky_cta_clicked", path: "/order", locationId: loc.id, locale })}
+      href={`/${locale}/order?location=${encodeURIComponent(loc.slug)}`}
+      onClick={() => {
+        setStoredSelectedLocationId(loc.id);
+        try {
+          sessionStorage.setItem("order_locationId", loc.id);
+          sessionStorage.setItem("order_locationSlug", loc.slug);
+          sessionStorage.setItem("order_locationName", loc.name);
+        } catch { /* ignore */ }
+        track({ event: "sticky_cta_clicked", path: "/order", locationId: loc.id, locale });
+      }}
       className={`relative flex-1 flex items-center justify-center gap-1 px-2 py-1.5 ${loc.accentBg} text-white text-[11px] font-bold rounded-md ${loc.accentHover} transition-colors`}
     >
       {cartCount > 0 && (

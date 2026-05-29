@@ -7,6 +7,7 @@ import Link from "next/link";
 import { CalendarDays, Check, ChevronRight, Clock3, Filter, Info, MapPin, Minus, Plus, ShoppingCart, Store, X } from "lucide-react";
 import { useCart } from "@/components/CartContext";
 import { cleanExclusionLabel } from "@/lib/cart-display";
+import { getStoredSelectedLocationId, setStoredSelectedLocationId } from "@/lib/location-state";
 
 type ProductOption = {
   id: string;
@@ -160,14 +161,22 @@ export default function MenuOrderClient({ dietaryOptions, locale }: MenuOrderCli
 
     async function loadLocationMenu() {
       const storedId = sessionStorage.getItem("order_locationId") || "";
-      const storedSlug = sessionStorage.getItem("order_locationSlug") || "utrecht";
+      const storedSlug = sessionStorage.getItem("order_locationSlug") || "";
       const locationsResponse = await fetch("/api/locations");
       if (!locationsResponse.ok) throw new Error("Unable to load locations");
       const locations = await locationsResponse.json() as ApiLocation[];
+      const storedPreferenceId = getStoredSelectedLocationId(locations.map((candidate) => candidate.id));
       const location = locations.find((candidate) => candidate.id === storedId || candidate.slug === storedSlug)
+        ?? locations.find((candidate) => candidate.id === storedPreferenceId)
         ?? locations.find((candidate) => candidate.slug === "utrecht")
         ?? locations[0];
       if (!location) throw new Error("No location available");
+      setStoredSelectedLocationId(location.id);
+      try {
+        sessionStorage.setItem("order_locationId", location.id);
+        sessionStorage.setItem("order_locationSlug", location.slug);
+        sessionStorage.setItem("order_locationName", location.name);
+      } catch { /* ignore */ }
 
       if (!cancelled) {
         setPickupChoice({

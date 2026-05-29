@@ -18,6 +18,7 @@ import Link from "next/link";
 import { useLocale } from "next-intl";
 import { useRouter, useSearchParams } from "next/navigation";
 import { calculateStatus } from "@/lib/status";
+import { getStoredSelectedLocationId, setStoredSelectedLocationId } from "@/lib/location-state";
 
 type Step = {
   id: number;
@@ -262,7 +263,7 @@ export default function OrderPickupPage() {
   const locale = useLocale();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const requestedLocation = searchParams.get("location")?.toLowerCase() || "utrecht";
+  const requestedLocation = searchParams.get("location")?.toLowerCase() || "";
   const copy = getOrderCopy(locale);
   const localizedSteps = useMemo(
     () => steps.map((step, index) => ({ ...step, label: copy.steps[index] })),
@@ -299,8 +300,23 @@ export default function OrderPickupPage() {
         }));
         setLocations(nextLocations);
         setSelectedLocationId((current) => {
+          const validIds = nextLocations.map((location) => location.id);
           const requested = nextLocations.find((location) => location.slug === requestedLocation);
-          if (requested) return requested.id;
+          if (requested) {
+            setStoredSelectedLocationId(requested.id);
+            return requested.id;
+          }
+          const storedSessionId = sessionStorage.getItem("order_locationId") || "";
+          const storedSessionSlug = sessionStorage.getItem("order_locationSlug") || "";
+          const sessionLocation = nextLocations.find(
+            (location) => location.id === storedSessionId || location.slug === storedSessionSlug
+          );
+          if (sessionLocation) {
+            setStoredSelectedLocationId(sessionLocation.id);
+            return sessionLocation.id;
+          }
+          const storedLocationId = getStoredSelectedLocationId(validIds);
+          if (storedLocationId) return storedLocationId;
           const currentLocation = nextLocations.find((location) => location.id === current || location.slug === current);
           return currentLocation?.id ?? nextLocations[0].id;
         });
@@ -343,6 +359,7 @@ export default function OrderPickupPage() {
       sessionStorage.setItem("order_locationId", selectedLocation.id);
       sessionStorage.setItem("order_locationSlug", selectedLocation.slug);
       sessionStorage.setItem("order_locationName", selectedLocation.name);
+      setStoredSelectedLocationId(selectedLocation.id);
       sessionStorage.setItem("order_pickupDate", selectedDate);
       sessionStorage.setItem("order_pickupTime", selectedTime);
       if (slot?.id) {
@@ -370,7 +387,16 @@ export default function OrderPickupPage() {
               locations={locations}
               copy={copy}
               locale={locale}
-              onSelectLocation={setSelectedLocationId}
+              onSelectLocation={(locationId) => {
+                setSelectedLocationId(locationId);
+                setStoredSelectedLocationId(locationId);
+                const nextLocation = locations.find((location) => location.id === locationId);
+                if (nextLocation) {
+                  sessionStorage.setItem("order_locationId", nextLocation.id);
+                  sessionStorage.setItem("order_locationSlug", nextLocation.slug);
+                  sessionStorage.setItem("order_locationName", nextLocation.name);
+                }
+              }}
             />
             <TimeSlotSelector slots={availableTimeSlots} selectedTime={selectedTime} onSelect={setSelectedTime} copy={copy} />
             <AnotherDayCard

@@ -26,6 +26,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { formatCartChoices } from "@/lib/cart-display";
+import { getStoredSelectedLocationId, setStoredSelectedLocationId } from "@/lib/location-state";
 
 function fmtPrice(cents: number) {
   return `€${(cents / 100).toFixed(2).replace(".", ",")}`;
@@ -149,11 +150,18 @@ export default function CheckoutPage() {
       fetch("/api/locations")
         .then((response) => response.ok ? response.json() : [])
         .then((locations: CheckoutLocation[]) => {
-          const selectedLocation = resolveLocationId(locations, storedLocationId, storedLocationSlug, storedLocationName);
+          const storedPreferenceId = getStoredSelectedLocationId(locations.map((location) => location.id));
+          const selectedLocation = resolveLocationId(
+            locations,
+            storedLocationId || storedPreferenceId || "",
+            storedLocationSlug,
+            storedLocationName
+          );
           if (!selectedLocation?.id) return;
           sessionStorage.setItem("order_locationId", selectedLocation.id);
           if (selectedLocation.slug) sessionStorage.setItem("order_locationSlug", selectedLocation.slug);
           if (selectedLocation.name) sessionStorage.setItem("order_locationName", selectedLocation.name);
+          setStoredSelectedLocationId(selectedLocation.id);
           setLocationId(selectedLocation.id);
           setLocationName(selectedLocation.name || "");
           if (
