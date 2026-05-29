@@ -16,6 +16,49 @@ interface OrderItemInput {
   exclusionNames?: string[];
 }
 
+const PICKUP_LEAD_TIME_MINUTES = 30;
+
+function getAmsterdamNow() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Amsterdam",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date());
+  const part = (type: string) => parts.find((value) => value.type === type)?.value ?? "";
+
+  return {
+    date: `${part("year")}-${part("month")}-${part("day")}`,
+    minutes: Number(part("hour")) * 60 + Number(part("minute")),
+  };
+}
+
+function parseTimeToMinutes(time: string) {
+  const match = time.match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+  return hours * 60 + minutes;
+}
+
+function validatePickupLeadTime(date: Date, time: string) {
+  const amsterdamNow = getAmsterdamNow();
+  const pickupDate = date.toISOString().split("T")[0];
+  const pickupMinutes = parseTimeToMinutes(time);
+
+  if (pickupMinutes === null) return "Invalid pickup time";
+  if (pickupDate < amsterdamNow.date) return "Pickup time is no longer available";
+  if (pickupDate === amsterdamNow.date && pickupMinutes < amsterdamNow.minutes + PICKUP_LEAD_TIME_MINUTES) {
+    return "Pickup time must be at least 30 minutes from now";
+  }
+
+  return null;
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -33,12 +76,17 @@ export async function POST(req: Request) {
       locationId = locationBySlug?.id;
     }
     let slotId = slot as string | undefined;
+    let selectedSlot: { id: string; date: Date; time: string } | null = null;
     if (slotId) {
-      const slotExists = await prisma.pickupSlot.findUnique({ where: { id: slotId }, select: { id: true } });
-      if (!slotExists) slotId = undefined;
+      selectedSlot = await prisma.pickupSlot.findUnique({ where: { id: slotId }, select: { id: true, date: true, time: true } });
+      if (!selectedSlot) slotId = undefined;
     }
     if (!slotId && locationId && pickupDate && pickupTime) {
       const pickupDateValue = new Date(`${pickupDate}T00:00:00`);
+      const pickupLeadTimeError = validatePickupLeadTime(pickupDateValue, pickupTime);
+      if (pickupLeadTimeError) {
+        return NextResponse.json({ error: pickupLeadTimeError }, { status: 400 });
+      }
       const slotRecord = await prisma.pickupSlot.upsert({
         where: {
           locationId_date_time: {
@@ -54,12 +102,19 @@ export async function POST(req: Request) {
           time: pickupTime,
           capacity: 50,
         },
-        select: { id: true },
+        select: { id: true, date: true, time: true },
       });
       slotId = slotRecord.id;
+      selectedSlot = slotRecord;
     }
     if (!locationId || !slotId) {
       return NextResponse.json({ error: "Missing location or pickup time" }, { status: 400 });
+    }
+    if (selectedSlot) {
+      const pickupLeadTimeError = validatePickupLeadTime(selectedSlot.date, selectedSlot.time);
+      if (pickupLeadTimeError) {
+        return NextResponse.json({ error: pickupLeadTimeError }, { status: 400 });
+      }
     }
 
     const itemIds = (items as OrderItemInput[]).map((item) => item.menuItemId);

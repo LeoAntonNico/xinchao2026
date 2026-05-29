@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { previewLocations } from "@/lib/local-preview-data";
 
+const PICKUP_LEAD_TIME_MINUTES = 30;
+
 function formatLocalDate(date: Date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -20,21 +22,39 @@ function formatTime(minutes: number) {
   return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
 }
 
-function previewTimes(locationId: string) {
+function getAmsterdamNow() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Amsterdam",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date());
+  const part = (type: string) => parts.find((value) => value.type === type)?.value ?? "";
+
+  return {
+    date: `${part("year")}-${part("month")}-${part("day")}`,
+    minutes: Number(part("hour")) * 60 + Number(part("minute")),
+  };
+}
+
+function previewTimes(locationId: string, minimumMinutes = Number.NEGATIVE_INFINITY) {
   const location = previewLocations.find((loc) => loc.id === locationId);
   const openMinutes = parseTime(location?.openTime ?? "12:00");
   const closeMinutes = parseTime(location?.closeTime ?? "20:00");
   const times: string[] = [];
 
   for (let minutes = openMinutes; minutes <= closeMinutes; minutes += 15) {
-    times.push(formatTime(minutes));
+    if (minutes >= minimumMinutes) times.push(formatTime(minutes));
   }
 
   return times;
 }
 
 function previewSlots(locationId: string, days: number) {
-  const times = previewTimes(locationId);
+  const amsterdamNow = getAmsterdamNow();
   const today = new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Amsterdam" }));
   today.setHours(0, 0, 0, 0);
 
@@ -42,6 +62,9 @@ function previewSlots(locationId: string, days: number) {
     const date = new Date(today);
     date.setDate(today.getDate() + dayIndex);
     const dateStr = formatLocalDate(date);
+    const minimumMinutes =
+      dateStr === amsterdamNow.date ? amsterdamNow.minutes + PICKUP_LEAD_TIME_MINUTES : Number.NEGATIVE_INFINITY;
+    const times = previewTimes(locationId, minimumMinutes);
 
     return times.map((time) => ({
       id: `preview-slot-${dateStr}-${time.replace(":", "")}`,
@@ -58,8 +81,8 @@ export async function GET(req: Request) {
 
   if (!locationId) return NextResponse.json({ error: "No location" }, { status: 400 });
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const amsterdamNow = getAmsterdamNow();
+  const today = new Date(`${amsterdamNow.date}T00:00:00`);
   const end = new Date(today);
   end.setDate(today.getDate() + days);
 
@@ -73,11 +96,16 @@ export async function GET(req: Request) {
     return NextResponse.json(previewSlots(locationId, days));
   }
 
-  const slots = slotsRaw.map((s) => ({
-    id: s.id,
-    date: s.date.toISOString().split("T")[0], // YYYY-MM-DD
-    time: s.time,
-  }));
+  const slots = slotsRaw
+    .map((s) => ({
+      id: s.id,
+      date: s.date.toISOString().split("T")[0], // YYYY-MM-DD
+      time: s.time,
+    }))
+    .filter((slot) => {
+      if (slot.date !== amsterdamNow.date) return true;
+      return parseTime(slot.time) >= amsterdamNow.minutes + PICKUP_LEAD_TIME_MINUTES;
+    });
 
   return NextResponse.json(slots);
 }

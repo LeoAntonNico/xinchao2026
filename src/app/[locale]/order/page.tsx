@@ -55,6 +55,8 @@ type PickupLocation = {
 
 type OrderCopy = ReturnType<typeof getOrderCopy>;
 
+const PICKUP_LEAD_TIME_MINUTES = 30;
+
 const steps: Step[] = [
   { id: 1, label: "Location", status: "complete" },
   { id: 2, label: "Time", status: "active" },
@@ -272,7 +274,7 @@ export default function OrderPickupPage() {
   const [locations, setLocations] = useState<PickupLocation[]>(pickupLocations);
   const [savingSelection, setSavingSelection] = useState(false);
   const [dayPickerOpen, setDayPickerOpen] = useState(false);
-  const [amsterdamNow, setAmsterdamNow] = useState<{ date: string; minutes: number } | null>(null);
+  const [amsterdamNow, setAmsterdamNow] = useState(() => getAmsterdamNow());
   const menuHref = useMemo(() => `/${locale}/menu`, [locale]);
   const selectedLocation = useMemo(
     () => locations.find((location) => location.id === selectedLocationId) ?? locations[0] ?? pickupLocations[0],
@@ -315,9 +317,9 @@ export default function OrderPickupPage() {
 
   const availableTimeSlots = useMemo(
     () => buildPickupTimeSlots(selectedLocation).filter((slot) => {
-      if (!amsterdamNow || selectedDate !== amsterdamNow.date) return true;
+      if (selectedDate !== amsterdamNow.date) return true;
       const minutes = parseTimeToMinutes(slot.time);
-      return minutes !== null && minutes > amsterdamNow.minutes;
+      return minutes !== null && minutes >= amsterdamNow.minutes + PICKUP_LEAD_TIME_MINUTES;
     }),
     [selectedLocation, selectedDate, amsterdamNow]
   );
