@@ -23,6 +23,16 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Location not found" }, { status: 404 });
   }
 
+  const daySetting = await prisma.reservationDaySetting.findUnique({
+    where: {
+      locationId_date: {
+        locationId,
+        date,
+      },
+    },
+    select: { reservationsEnabled: true },
+  });
+
   const reservations = await prisma.reservation.groupBy({
     by: ["time"],
     where: {
@@ -41,5 +51,6 @@ export async function GET(req: Request) {
   return NextResponse.json({
     capacity: location.capacity,
     availability,
+    reservationsEnabled: daySetting?.reservationsEnabled ?? true,
   });
 }

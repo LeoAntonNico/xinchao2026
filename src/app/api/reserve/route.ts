@@ -63,6 +63,24 @@ async function checkReservationAvailability(input: {
     };
   }
 
+  const daySetting = await prisma.reservationDaySetting.findUnique({
+    where: {
+      locationId_date: {
+        locationId: input.locationId,
+        date: new Date(input.date),
+      },
+    },
+    select: { reservationsEnabled: true },
+  });
+  if (daySetting?.reservationsEnabled === false) {
+    return {
+      error: NextResponse.json(
+        { error: "Sorry, we're fully booked today. We do accept walk-ins. We always keep a few tables open for the brave." },
+        { status: 400 }
+      ),
+    };
+  }
+
   const existing = await prisma.reservation.aggregate({
     where: {
       locationId: input.locationId,

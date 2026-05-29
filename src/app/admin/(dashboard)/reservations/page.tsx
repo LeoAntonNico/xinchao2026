@@ -26,6 +26,13 @@ interface Reservation {
 
 type DateScope = "TODAY" | "UPCOMING" | "PAST";
 
+interface ReservationDaySetting {
+  id: string;
+  locationId: string;
+  date: string;
+  reservationsEnabled: boolean;
+}
+
 const PAGE_SIZE = 10;
 
 const statusConfig: Record<string, { label: string; bg: string; text: string; border: string }> = {
@@ -58,6 +65,7 @@ const statusConfig: Record<string, { label: string; bg: string; text: string; bo
 export default function ReservationsPage() {
   const [items, setItems] = useState<Reservation[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
+  const [daySettings, setDaySettings] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Reservation | null>(null);
@@ -68,19 +76,32 @@ export default function ReservationsPage() {
   const [dateFilter, setDateFilter] = useState("");
   const [dateScope, setDateScope] = useState<DateScope>("TODAY");
   const [currentPage, setCurrentPage] = useState(1);
+  const [savingDayKey, setSavingDayKey] = useState<string | null>(null);
   const todayKey = format(new Date(), "yyyy-MM-dd");
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [resvRes, locsRes] = await Promise.all([
+      const [resvRes, locsRes, daySettingsRes] = await Promise.all([
         fetch("/api/admin/reservations"),
         fetch("/api/admin/locations"),
+        fetch("/api/admin/reservation-days"),
       ]);
       const resvData = await resvRes.json();
       const locsData = await locsRes.json();
+      const daySettingsData = await daySettingsRes.json();
       setItems(resvRes.ok ? resvData : []);
       setLocations(locsRes.ok ? locsData : []);
+      if (daySettingsRes.ok) {
+        setDaySettings(
+          Object.fromEntries(
+            (daySettingsData as ReservationDaySetting[]).map((setting) => [
+              `${setting.locationId}:${setting.date}`,
+              setting.reservationsEnabled,
+            ])
+          )
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -224,6 +245,36 @@ export default function ReservationsPage() {
     }
   }
 
+  async function toggleReservationDay(date: string) {
+    if (locationFilter === "ALL") return;
+    const key = `${locationFilter}:${date}`;
+    const current = daySettings[key] ?? true;
+    const next = !current;
+    setSavingDayKey(key);
+    setDaySettings((prev) => ({ ...prev, [key]: next }));
+    try {
+      const res = await fetch("/api/admin/reservation-days", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          locationId: locationFilter,
+          date,
+          reservationsEnabled: next,
+        }),
+      });
+      if (!res.ok) throw new Error("Could not update reservation day");
+      const saved = (await res.json()) as ReservationDaySetting;
+      setDaySettings((prev) => ({
+        ...prev,
+        [`${saved.locationId}:${saved.date}`]: saved.reservationsEnabled,
+      }));
+    } catch {
+      setDaySettings((prev) => ({ ...prev, [key]: current }));
+    } finally {
+      setSavingDayKey(null);
+    }
+  }
+
   function handleExport() {
     const headers = ["Date", "Time", "Name", "Email", "Phone", "Location", "Party", "Status", "Notes"];
     const rows = filtered.map((r) => [
@@ -246,6 +297,11 @@ export default function ReservationsPage() {
     a.click();
     URL.revokeObjectURL(url);
   }
+
+  const managedDate = dateFilter || (dateScope === "TODAY" ? todayKey : "");
+  const managedDayKey = locationFilter !== "ALL" && managedDate ? `${locationFilter}:${managedDate}` : "";
+  const managedReservationsEnabled = managedDayKey ? (daySettings[managedDayKey] ?? true) : true;
+  const managedLocationName = locations.find((location) => location.id === locationFilter)?.name;
 
   if (loading) {
     return (
@@ -405,6 +461,43 @@ export default function ReservationsPage() {
         </button>
       </div>
 
+      {managedDate && locationFilter !== "ALL" && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#DDD6CA] bg-white px-4 py-3">
+          <div>
+            <p className="text-sm font-semibold text-[#171717]">
+              Reservations for {managedLocationName} on {format(parseISO(managedDate), "EEEE, d MMMM yyyy")}
+            </p>
+            <p className="mt-0.5 text-xs text-[#6B7280]">
+              Turn this day off when the restaurant is fully booked.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => toggleReservationDay(managedDate)}
+            disabled={savingDayKey === managedDayKey}
+            className={`inline-flex min-h-10 items-center gap-2 rounded-full border px-4 text-sm font-semibold transition-colors disabled:opacity-60 ${
+              managedReservationsEnabled
+                ? "border-[#86EFAC] bg-[#DCFCE7] text-[#15803D]"
+                : "border-[#FCA5A5] bg-[#FEE2E2] text-[#B91C1C]"
+            }`}
+          >
+            <span
+              className={`h-4 w-8 rounded-full p-0.5 transition-colors ${
+                managedReservationsEnabled ? "bg-[#22C55E]" : "bg-[#EF4444]"
+              }`}
+              aria-hidden="true"
+            >
+              <span
+                className={`block h-3 w-3 rounded-full bg-white transition-transform ${
+                  managedReservationsEnabled ? "translate-x-4" : "translate-x-0"
+                }`}
+              />
+            </span>
+            {managedReservationsEnabled ? "Reservations on" : "Reservations off"}
+          </button>
+        </div>
+      )}
+
       {dateScope !== "PAST" && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#E8E2D6] bg-[#FAF7F1] px-4 py-3 text-sm text-[#6B7280]">
           <span>Past days are hidden to keep today&apos;s service focused.</span>
@@ -444,16 +537,50 @@ export default function ReservationsPage() {
                 {paginatedRows.map((row, idx) => {
                   if (row.type === "header") {
                     const dateObj = parseISO(row.date);
+                    const selectedLocationName = locations.find((location) => location.id === locationFilter)?.name;
+                    const dayKey = locationFilter === "ALL" ? "" : `${locationFilter}:${row.date}`;
+                    const reservationsEnabled = daySettings[dayKey] ?? true;
                     return (
                       <tr key={`h-${row.date}`} className="bg-[#FAF7F1]">
                         <td colSpan={7} className="px-5 py-2.5">
-                          <div className="flex items-center gap-3">
-                            <span className="font-semibold text-sm text-[#171717]">
-                              {format(dateObj, "EEEE, d MMMM yyyy")}
-                            </span>
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[#F3F4F6] text-[#6B7280]">
-                              {row.count} reservations
-                            </span>
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div className="flex flex-wrap items-center gap-3">
+                              <span className="font-semibold text-sm text-[#171717]">
+                                {format(dateObj, "EEEE, d MMMM yyyy")}
+                              </span>
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[#F3F4F6] text-[#6B7280]">
+                                {row.count} reservations
+                              </span>
+                            </div>
+                            {locationFilter !== "ALL" ? (
+                              <button
+                                type="button"
+                                onClick={() => toggleReservationDay(row.date)}
+                                disabled={savingDayKey === dayKey}
+                                className={`inline-flex min-h-8 items-center gap-2 rounded-full border px-3 text-xs font-semibold transition-colors disabled:opacity-60 ${
+                                  reservationsEnabled
+                                    ? "border-[#86EFAC] bg-[#DCFCE7] text-[#15803D]"
+                                    : "border-[#FCA5A5] bg-[#FEE2E2] text-[#B91C1C]"
+                                }`}
+                                title={`${selectedLocationName || "Location"} reservations for ${row.date}`}
+                              >
+                                <span
+                                  className={`h-3.5 w-7 rounded-full p-0.5 transition-colors ${
+                                    reservationsEnabled ? "bg-[#22C55E]" : "bg-[#EF4444]"
+                                  }`}
+                                  aria-hidden="true"
+                                >
+                                  <span
+                                    className={`block h-2.5 w-2.5 rounded-full bg-white transition-transform ${
+                                      reservationsEnabled ? "translate-x-3.5" : "translate-x-0"
+                                    }`}
+                                  />
+                                </span>
+                                {reservationsEnabled ? "Reservations on" : "Reservations off"}
+                              </button>
+                            ) : (
+                              <span className="text-xs text-[#9CA3AF]">Select a location to manage this day</span>
+                            )}
                           </div>
                         </td>
                       </tr>

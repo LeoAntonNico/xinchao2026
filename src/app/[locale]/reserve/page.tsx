@@ -23,6 +23,7 @@ interface Location {
 interface Availability {
   capacity: number;
   availability: Record<string, number>;
+  reservationsEnabled?: boolean;
 }
 
 interface ConfirmedReservation {
@@ -217,6 +218,17 @@ export default function ReservePage() {
     if (!avail) return null;
     return avail.availability[time] ?? avail.capacity;
   };
+
+  const reservationsOff = avail?.reservationsEnabled === false;
+  const reservationsOffMessage = isNl
+    ? "Sorry, we zitten vandaag vol. Je kunt wel gewoon binnenlopen. We houden altijd een paar tafels vrij voor de dapperen."
+    : "Sorry, we're fully booked today. We do accept walk-ins. We always keep a few tables open for the brave.";
+
+  useEffect(() => {
+    if (reservationsOff && form.time) {
+      setForm((current) => ({ ...current, time: "" }));
+    }
+  }, [reservationsOff, form.time]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -421,11 +433,16 @@ export default function ReservePage() {
                     <Clock className="w-3.5 h-3.5" />
                     {isNl ? "Voorkeurstijd" : "Preferred Time"}
                   </label>
+                  {reservationsOff && (
+                    <div className="border border-logo-red/20 bg-logo-red/10 px-4 py-3 text-sm font-medium text-logo-red">
+                      {reservationsOffMessage}
+                    </div>
+                  )}
                   <div className="grid grid-cols-4 gap-2.5">
                     {times.map((t) => {
                       const seats = getAvailable(t);
-                      const isFull = seats !== null && seats <= 0;
-                      const selected = form.time === t;
+                      const isFull = reservationsOff || (seats !== null && seats <= 0);
+                      const selected = !isFull && form.time === t;
                       return (
                         <button
                           key={t}
@@ -544,7 +561,7 @@ export default function ReservePage() {
             {/* ── Submit ── */}
             <button
               type="submit"
-              disabled={loading || loadingEditReservation || !form.time}
+              disabled={loading || loadingEditReservation || !form.time || reservationsOff}
               className="w-full py-5 bg-logo-red text-white font-bold text-[15px] tracking-[0.06em] uppercase hover:bg-logo-red-hover transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-3"
             >
               {loading
