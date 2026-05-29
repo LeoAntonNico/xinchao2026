@@ -86,6 +86,15 @@ function formatReservationDate(dateValue: string, isNl: boolean) {
   });
 }
 
+function getAmsterdamDateKey() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Amsterdam",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
 function reservationCode(id: string) {
   return `XC-${id.slice(-4).toUpperCase()}`;
 }
@@ -164,11 +173,16 @@ export default function ReservePage() {
       queueMicrotask(() => setAvail(null));
       return;
     }
-    fetch(`/api/reserve/availability?locationId=${form.locationId}&date=${form.date}`)
+    const params = new URLSearchParams({
+      locationId: form.locationId,
+      date: form.date,
+    });
+    if (editingReservationId) params.set("excludeReservationId", editingReservationId);
+    fetch(`/api/reserve/availability?${params.toString()}`)
       .then((r) => r.json())
       .then((d) => setAvail(d))
       .catch(() => setAvail(null));
-  }, [form.locationId, form.date]);
+  }, [form.locationId, form.date, editingReservationId]);
 
   const selectedLocation = locations.find((l) => l.id === form.locationId);
   const minPartySize = minimumPartySize(selectedLocation);
@@ -200,10 +214,11 @@ export default function ReservePage() {
     }
 
     /* If selected date is today, hide times that have already passed */
-    const today = new Date().toISOString().split("T")[0];
+    const today = getAmsterdamDateKey();
     if (form.date === today) {
       const now = new Date();
-      const nowMinutes = now.getHours() * 60 + now.getMinutes();
+      const amsterdamTime = new Date(now.toLocaleString("en-US", { timeZone: "Europe/Amsterdam" }));
+      const nowMinutes = amsterdamTime.getHours() * 60 + amsterdamTime.getMinutes();
       return slots.filter((t) => {
         const [th, tm] = t.split(":").map(Number);
         const slotMinutes = th * 60 + tm;
@@ -217,6 +232,20 @@ export default function ReservePage() {
     if (!avail) return null;
     return avail.availability[time] ?? avail.capacity;
   };
+
+  const isTimeUnavailable = (time: string) => {
+    const seats = getAvailable(time);
+    return seats !== null && seats < form.partySize;
+  };
+
+  const noAvailableTimes = avail !== null && times.length > 0 && times.every((time) => isTimeUnavailable(time));
+  const selectedDateIsToday = form.date === getAmsterdamDateKey();
+
+  useEffect(() => {
+    if (form.time && isTimeUnavailable(form.time)) {
+      setForm((current) => ({ ...current, time: "" }));
+    }
+  }, [avail, form.partySize, form.time]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -384,7 +413,7 @@ export default function ReservePage() {
                     <input
                       type="date"
                       value={form.date}
-                      min={new Date().toISOString().split("T")[0]}
+                      min={getAmsterdamDateKey()}
                       onChange={(e) => setForm({ ...form, date: e.target.value, time: "" })}
                       required
                       className="w-full px-4 py-3.5 bg-white border border-gray-200 text-foreground text-[14px] focus:border-logo-red focus:outline-none transition-colors placeholder:text-gray-400"
@@ -421,22 +450,29 @@ export default function ReservePage() {
                     <Clock className="w-3.5 h-3.5" />
                     {isNl ? "Voorkeurstijd" : "Preferred Time"}
                   </label>
+                  {selectedDateIsToday && noAvailableTimes && (
+                    <div className="border border-logo-red/20 bg-logo-red/10 px-4 py-3 text-sm text-logo-red">
+                      We&apos;re fully booked for today. Please select another day or just walk in. We always keep a few tables open for the brave.
+                    </div>
+                  )}
                   <div className="grid grid-cols-4 gap-2.5">
                     {times.map((t) => {
                       const seats = getAvailable(t);
-                      const isFull = seats !== null && seats <= 0;
+                      const isFull = isTimeUnavailable(t);
                       const selected = form.time === t;
                       return (
                         <button
                           key={t}
                           type="button"
                           disabled={isFull}
+                          aria-disabled={isFull}
                           onClick={() => setForm({ ...form, time: t })}
+                          title={isFull ? "Fully booked" : undefined}
                           className={`relative py-3 border text-[12px] font-bold font-mono uppercase tracking-wide transition-all ${
                             selected
                               ? "bg-logo-red text-white border-logo-red"
                               : isFull
-                                ? "border-gray-100 text-gray-300 cursor-not-allowed line-through"
+                                ? "border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed opacity-70 line-through"
                                 : "border-gray-200 text-foreground hover:border-logo-red hover:text-logo-red"
                           }`}
                         >

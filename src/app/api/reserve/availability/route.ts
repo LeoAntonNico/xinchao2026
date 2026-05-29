@@ -6,6 +6,7 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const locationId = searchParams.get("locationId");
   const dateStr = searchParams.get("date");
+  const excludeReservationId = searchParams.get("excludeReservationId");
 
   if (!locationId || !dateStr) {
     return NextResponse.json({ error: "Missing locationId or date" }, { status: 400 });
@@ -29,6 +30,7 @@ export async function GET(req: Request) {
       locationId,
       date,
       status: { not: "CANCELLED" },
+      ...(excludeReservationId ? { id: { not: excludeReservationId } } : {}),
     },
     _sum: { partySize: true },
   });
