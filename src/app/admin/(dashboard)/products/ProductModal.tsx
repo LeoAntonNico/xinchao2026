@@ -1,6 +1,6 @@
 "use client";
 
-import type { MenuItem, Category, Location, Variant, Modifier, DietaryOption, Exclusion } from "./types";
+import type { MenuItem, Category, Location, Variant, Modifier, DietaryOption, Exclusion, PlasticSurcharge } from "./types";
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { X, Upload, Trash2, Plus, Flame, Pencil, ChevronDown, ChevronUp, GripVertical } from "lucide-react";
@@ -83,6 +83,7 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
   const [sortOrder, setSortOrder] = useState("0");
   const [categoryIds, setCategoryIds] = useState<string[]>([]);
   const [locationIds, setLocationIds] = useState<string[]>([]);
+  const [plasticSurcharges, setPlasticSurcharges] = useState<PlasticSurcharge[]>([]);
   const [dietaryTags, setDietaryTags] = useState<string[]>([]);
   const [isSpicy, setIsSpicy] = useState(false);
 
@@ -155,6 +156,7 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
       setSortOrder(String(editingItem.sortOrder));
       setCategoryIds(editingItem.categories?.map((c) => c.id) || []);
       setLocationIds(editingItem.locations?.map((l) => l.id) || []);
+      setPlasticSurcharges(editingItem.plasticSurcharges || []);
       setDietaryTags(editingItem.dietaryTags || []);
       setIsSpicy(editingItem.isSpicy || false);
       setVariants(editingItem.variants || []);
@@ -168,6 +170,7 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
       setVariants([]); setModifiers([]);
       setCategoryIds(categories[0] ? [categories[0].id] : []);
       setLocationIds(locations[0] ? [locations[0].id] : []);
+      setPlasticSurcharges([]);
     }
     setErrors([]); setSaving(false); setShowNewCat(false); setNewCatName("");
     setNewVariantName(""); setNewVariantNameNl(""); setNewVariantPrice("");
@@ -254,13 +257,23 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
 
     const priceNum = inputToCents(priceEur)!;
     const saleNum = inputToCents(salePriceEur);
+    const payloadPlasticSurcharges = locations
+      .map((location) => {
+        const surcharge = plasticSurcharges.find((entry) => entry.locationId === location.id);
+        return {
+          locationId: location.id,
+          amount: surcharge?.amount || 0,
+          isActive: Boolean(surcharge?.isActive),
+        };
+      })
+      .filter((surcharge) => surcharge.isActive || surcharge.amount > 0);
     const payload = {
       name, nameNl: nameNl || null, description: description || null, descriptionNl: descriptionNl || null,
       shortDescription: shortDescription || null, shortDescriptionNl: shortDescriptionNl || null,
       price: priceNum, salePrice: saleNum, taxClass,
       imageUrl: imageUrl || null, imageUrls: imageUrls || [], isAvailable, isDineInOnly,
       categoryIds, locationIds, sortOrder: parseInt(sortOrder) || 0,
-      dietaryTags, isSpicy,
+      dietaryTags, isSpicy, plasticSurcharges: payloadPlasticSurcharges,
     };
 
     try {
@@ -282,6 +295,7 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
       newItem.imageUrl = item.imageUrl; newItem.imageUrls = item.imageUrls;
       newItem.isAvailable = item.isAvailable; newItem.isDineInOnly = item.isDineInOnly; newItem.sortOrder = item.sortOrder;
       newItem.categories = item.categories; newItem.locations = item.locations;
+      newItem.plasticSurcharges = item.plasticSurcharges || payloadPlasticSurcharges;
       newItem.dietaryTags = item.dietaryTags; newItem.isSpicy = item.isSpicy;
       newItem.id = item.id;
 
@@ -322,7 +336,21 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
 
     const res = await fetch(`/api/admin/menu-items/${itemId}`, { credentials: "include" });
     if (res.ok) return await res.json();
-    return { id: itemId, name, nameNl: nameNl || null, description, descriptionNl: descriptionNl || null, shortDescription, shortDescriptionNl: shortDescriptionNl || null, price: inputToCents(priceEur)!, salePrice: inputToCents(salePriceEur), taxClass, imageUrl, imageUrls, isAvailable, isDineInOnly, sortOrder: parseInt(sortOrder) || 0, dietaryTags, isSpicy, categories: categories.filter((c) => categoryIds.includes(c.id)), locations: locations.filter((l) => locationIds.includes(l.id)), variants, modifiers, exclusions } as MenuItem;
+    return { id: itemId, name, nameNl: nameNl || null, description, descriptionNl: descriptionNl || null, shortDescription, shortDescriptionNl: shortDescriptionNl || null, price: inputToCents(priceEur)!, salePrice: inputToCents(salePriceEur), taxClass, imageUrl, imageUrls, isAvailable, isDineInOnly, sortOrder: parseInt(sortOrder) || 0, dietaryTags, isSpicy, categories: categories.filter((c) => categoryIds.includes(c.id)), locations: locations.filter((l) => locationIds.includes(l.id)), plasticSurcharges, variants, modifiers, exclusions } as MenuItem;
+  }
+
+  function updatePlasticSurcharge(locationId: string, patch: Partial<PlasticSurcharge>) {
+    setPlasticSurcharges((prev) => {
+      const existing = prev.find((entry) => entry.locationId === locationId);
+      if (existing) {
+        return prev.map((entry) => entry.locationId === locationId ? { ...entry, ...patch } : entry);
+      }
+      return [...prev, { locationId, amount: 0, isActive: false, ...patch }];
+    });
+  }
+
+  function plasticSurchargeFor(locationId: string) {
+    return plasticSurcharges.find((entry) => entry.locationId === locationId) || { locationId, amount: 0, isActive: false };
   }
 
   function addVariant() {
@@ -644,6 +672,48 @@ export function ProductModal({ isOpen, onClose, onSave, editingItem, categories,
           <Section title={langTab === "nl" ? "Locaties" : "Locations"}>
             <div className="flex flex-wrap gap-2">
               {locations.map((l) => <CheckCard key={l.id} label={l.name} checked={locationIds.includes(l.id)} onChange={() => setLocationIds((prev) => prev.includes(l.id) ? prev.filter((id) => id !== l.id) : [...prev, l.id])} />)}
+            </div>
+          </Section>
+
+          {/* PLASTIC SURCHARGE */}
+          <Section title={langTab === "nl" ? "Plastic toeslag" : "Plastic surcharge"}>
+            <div className="space-y-3">
+              <p className="text-xs text-gray-500">
+                {langTab === "nl"
+                  ? "Activeer per locatie een plastic toeslag voor dit product. Het bedrag wordt bij de productprijs opgeteld in de bestelomgeving."
+                  : "Activate a plastic surcharge per location for this product. The amount is added to the product price in the ordering flow."}
+              </p>
+              <div className="space-y-2">
+                {locations.map((location) => {
+                  const surcharge = plasticSurchargeFor(location.id);
+                  return (
+                    <div key={location.id} className={`grid grid-cols-1 gap-3 rounded-lg border p-3 sm:grid-cols-[1fr_160px] sm:items-center ${surcharge.isActive ? "border-brand-red bg-brand-red/10" : "border-border-default bg-background"}`}>
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={surcharge.isActive}
+                          onChange={(e) => updatePlasticSurcharge(location.id, { isActive: e.target.checked })}
+                          className="w-4 h-4 rounded accent-brand-red"
+                        />
+                        <span className="text-sm font-medium text-foreground">{location.name}</span>
+                      </label>
+                      <div>
+                        <label className="sr-only">
+                          {langTab === "nl" ? `Plastic toeslag voor ${location.name}` : `Plastic surcharge for ${location.name}`}
+                        </label>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={centsToInput(surcharge.amount)}
+                          onChange={(e) => updatePlasticSurcharge(location.id, { amount: inputToCents(e.target.value) || 0 })}
+                          placeholder="0,00"
+                          className="w-full rounded-lg border border-border-default bg-white px-3 py-2 text-sm text-foreground focus:border-gray-500 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </Section>
 

@@ -16,7 +16,12 @@ export async function GET(req: Request) {
           locations: { some: { id: locationId } },
         },
         orderBy: { sortOrder: "asc" },
-        include: { variants: { orderBy: { sortOrder: "asc" } }, modifiers: { orderBy: { sortOrder: "asc" } }, exclusions: { orderBy: { sortOrder: "asc" } } },
+        include: {
+          variants: { orderBy: { sortOrder: "asc" } },
+          modifiers: { orderBy: { sortOrder: "asc" } },
+          exclusions: { orderBy: { sortOrder: "asc" } },
+          plasticSurcharges: { where: { locationId, isActive: true }, take: 1 },
+        },
       },
     },
   }).catch(() => previewMenuCategories);
@@ -38,6 +43,7 @@ export async function GET(req: Request) {
       isSpicy: item.isSpicy,
       isAvailable: item.isAvailable,
       isDineInOnly: item.isDineInOnly,
+      plasticSurcharge: "plasticSurcharges" in item ? item.plasticSurcharges[0]?.amount ?? 0 : 0,
       variants: "variants" in item ? item.variants : [],
       modifiers: "modifiers" in item ? item.modifiers : [],
       exclusions: "exclusions" in item ? item.exclusions : [],

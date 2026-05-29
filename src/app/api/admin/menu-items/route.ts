@@ -4,12 +4,38 @@ import { prisma } from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
 import { previewLocations, previewMenuCategories } from "@/lib/local-preview-data";
 
+const menuItemInclude = {
+  categories: true,
+  locations: true,
+  plasticSurcharges: true,
+  variants: { orderBy: { sortOrder: "asc" as const } },
+  modifiers: { orderBy: { sortOrder: "asc" as const } },
+  exclusions: { orderBy: { sortOrder: "asc" as const } },
+};
+
+type PlasticSurchargeInput = {
+  locationId?: string;
+  amount?: number;
+  isActive?: boolean;
+};
+
+function normalizePlasticSurcharges(input: unknown): Array<{ locationId: string; amount: number; isActive: boolean }> {
+  if (!Array.isArray(input)) return [];
+  return input.flatMap((entry: PlasticSurchargeInput) => {
+    if (!entry?.locationId) return [];
+    const amount = Number.isFinite(entry.amount) ? Math.max(0, Math.round(Number(entry.amount))) : 0;
+    const isActive = Boolean(entry.isActive);
+    if (!isActive && amount === 0) return [];
+    return [{ locationId: entry.locationId, amount, isActive }];
+  });
+}
+
 export async function GET() {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const items = await prisma.menuItem.findMany({
-      include: { categories: true, locations: true, variants: { orderBy: { sortOrder: "asc" } }, modifiers: { orderBy: { sortOrder: "asc" } }, exclusions: { orderBy: { sortOrder: "asc" } } },
+      include: menuItemInclude,
       orderBy: { sortOrder: "asc" },
     });
     return NextResponse.json(items);
@@ -25,6 +51,7 @@ export async function GET() {
         variants: [],
         modifiers: [],
         exclusions: [],
+        plasticSurcharges: [],
       }));
     });
 
@@ -38,6 +65,7 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json();
   const { name, nameNl, description, descriptionNl, shortDescription, shortDescriptionNl, price, salePrice, taxClass, imageUrl, imageUrls, isAvailable, isDineInOnly, categoryIds, locationIds, sortOrder, dietaryTags, isSpicy } = body;
+  const plasticSurcharges = normalizePlasticSurcharges(body.plasticSurcharges);
 
   if (!name || !price || !categoryIds || categoryIds.length === 0 || !locationIds || locationIds.length === 0) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -63,8 +91,15 @@ export async function POST(request: NextRequest) {
       isSpicy: isSpicy || false,
       categories: { connect: categoryIds.map((id: string) => ({ id })) },
       locations: { connect: locationIds.map((id: string) => ({ id })) },
+      plasticSurcharges: {
+        create: plasticSurcharges.map((surcharge) => ({
+          locationId: surcharge.locationId,
+          amount: surcharge.amount,
+          isActive: surcharge.isActive,
+        })),
+      },
     },
-    include: { categories: true, locations: true, variants: { orderBy: { sortOrder: "asc" } }, modifiers: { orderBy: { sortOrder: "asc" } }, exclusions: { orderBy: { sortOrder: "asc" } } },
+    include: menuItemInclude,
   });
   return NextResponse.json(item);
 }

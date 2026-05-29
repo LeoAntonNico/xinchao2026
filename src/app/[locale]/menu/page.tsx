@@ -113,6 +113,7 @@ export default async function MenuPage({ params }: { params: Promise<{ locale: s
         (isNl && item.descriptionNl ? item.descriptionNl : item.description) ||
         "",
       price: item.price,
+      plasticSurcharge: 0,
       image: item.imageUrls?.[0] || item.imageUrl || "/images/hero-pho.jpg",
       isDineInOnly: item.isDineInOnly,
       dietaryTags: item.dietaryTags,

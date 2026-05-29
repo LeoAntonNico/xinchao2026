@@ -24,6 +24,7 @@ model Location {
   nextOrderNumber Int  @default(999)
 
   menuItems              MenuItem[]
+  plasticSurcharges      ProductPlasticSurcharge[]
   pickupSlots            PickupSlot[]
   reservations           Reservation[]
   reservationDaySettings ReservationDaySetting[]
@@ -76,6 +77,22 @@ model MenuItem {
   variants   ProductVariant[]
   modifiers  ProductModifier[]
   exclusions ProductExclusion[]
+  plasticSurcharges ProductPlasticSurcharge[]
+}
+
+model ProductPlasticSurcharge {
+  id        String  @id @default(uuid())
+  amount    Int     @default(0) // cents
+  isActive  Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  menuItemId String
+  locationId String
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@unique([menuItemId, locationId])
 }
 
 model ProductExclusion {

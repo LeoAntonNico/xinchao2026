@@ -4,6 +4,7 @@ export interface Location { id: string; name: string; }
 export interface Variant { id: string; name: string; nameNl: string | null; price: number; sortOrder: number; }
 export interface Modifier { id: string; name: string; nameNl: string | null; price: number; sortOrder: number; }
 export interface Exclusion { id: string; name: string; nameNl: string | null; sortOrder: number; }
+export interface PlasticSurcharge { id?: string; locationId: string; amount: number; isActive: boolean; }
 export interface MenuItem {
   id: string;
   name: string;
@@ -27,4 +28,5 @@ export interface MenuItem {
   variants: Variant[];
   modifiers: Modifier[];
   exclusions: Exclusion[];
+  plasticSurcharges?: PlasticSurcharge[];
 }

@@ -84,6 +84,7 @@ export default function ProductsPage() {
         sortOrder: item.sortOrder,
         categoryIds: item.categories?.map((c) => c.id) || [],
         locationIds: item.locations?.map((l) => l.id) || [],
+        plasticSurcharges: item.plasticSurcharges || [],
         dietaryTags: item.dietaryTags || [],
         isSpicy: item.isSpicy,
       };

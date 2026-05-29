@@ -25,6 +25,7 @@ export type MenuItemView = {
   name: string;
   description: string;
   price: number;
+  plasticSurcharge: number;
   image: string;
   isDineInOnly: boolean;
   dietaryTags: string[];
@@ -104,6 +105,7 @@ function getCopy(locale: string) {
     yourChoice: isNl ? "Jouw keuze" : "Your choice",
     change: isNl ? "Wijzigen" : "Change",
     chooseOption: isNl ? "Kies je optie" : "Choose your option",
+    plasticSurcharge: isNl ? "Plastic toeslag" : "Plastic surcharge",
     specialRequests: isNl ? "Pas ingrediënten en speciale wensen aan." : "Adjust ingredients and special requests.",
   };
 }
@@ -200,6 +202,7 @@ export default function MenuOrderClient({ dietaryOptions, locale }: MenuOrderCli
               name: item.name,
               description: item.shortDescription || item.description || "",
               price: item.price,
+              plasticSurcharge: item.plasticSurcharge || 0,
               image: item.imageUrl || "/images/hero-pho.jpg",
               isDineInOnly: item.isDineInOnly,
               dietaryTags: item.dietaryTags,
@@ -235,7 +238,8 @@ export default function MenuOrderClient({ dietaryOptions, locale }: MenuOrderCli
   ) {
     if (item.isDineInOnly) return;
 
-    const unitPrice = (variant && variant.price > 0 ? variant.price : item.price) + modifiers.reduce((sum, modifier) => sum + modifier.price, 0);
+    const plasticSurcharge = item.plasticSurcharge || 0;
+    const unitPrice = (variant && variant.price > 0 ? variant.price : item.price) + modifiers.reduce((sum, modifier) => sum + modifier.price, 0) + plasticSurcharge;
     const payload = {
       menuItemId: item.id,
       name: item.name,
@@ -243,8 +247,8 @@ export default function MenuOrderClient({ dietaryOptions, locale }: MenuOrderCli
       imageUrl: item.image,
       variantId: variant?.id,
       variantName: variant?.name,
-      modifierIds: modifiers.map((modifier) => modifier.id),
-      modifierNames: modifiers.map((modifier) => modifier.name),
+      modifierIds: [...modifiers.map((modifier) => modifier.id), ...(plasticSurcharge > 0 ? ["plastic-surcharge"] : [])],
+      modifierNames: [...modifiers.map((modifier) => modifier.name), ...(plasticSurcharge > 0 ? [copy.plasticSurcharge] : [])],
       exclusionIds: exclusions.map((exclusion) => exclusion.id),
       exclusionNames: exclusions.map((exclusion) => exclusion.name),
     };
@@ -509,6 +513,11 @@ function MenuSection({
                   <p className="mt-2 line-clamp-2 text-[14px] leading-6 text-[#6B7280]">{item.description}</p>
                 )}
                 <p className="mt-4 text-base font-extrabold">{formatPrice(item.price)}</p>
+                {item.plasticSurcharge > 0 && (
+                  <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#8B6914]">
+                    + {formatPrice(item.plasticSurcharge)} {copy.plasticSurcharge}
+                  </p>
+                )}
                 {item.isDineInOnly && (
                   <span className="mt-3 inline-flex rounded-full border border-[#8B6914]/25 bg-[#FFF7E6] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#8B6914]">
                     {copy.dineInOnly}
@@ -564,7 +573,8 @@ function ProductOptionsModal({
   const selectedModifiers = item.modifiers.filter((modifier) => selectedModifierIds.includes(modifier.id));
   const selectedExclusions = item.exclusions.filter((exclusion) => selectedExclusionIds.includes(exclusion.id));
   const unitPrice = (selectedVariant && selectedVariant.price > 0 ? selectedVariant.price : item.price) +
-    selectedModifiers.reduce((sum, modifier) => sum + modifier.price, 0);
+    selectedModifiers.reduce((sum, modifier) => sum + modifier.price, 0) +
+    (item.plasticSurcharge || 0);
   const total = unitPrice * quantity;
 
   function toggleModifier(id: string) {
@@ -667,6 +677,13 @@ function ProductOptionsModal({
                       })}
                     </div>
                   </OptionGroup>
+                )}
+
+                {item.plasticSurcharge > 0 && (
+                  <div className="flex items-center justify-between border border-[#E8E4DF] bg-[#FAF9F7] p-3 text-sm">
+                    <span className="font-semibold">{copy.plasticSurcharge}</span>
+                    <span className="font-bold">+{formatPrice(item.plasticSurcharge)}</span>
+                  </div>
                 )}
 
                 {item.exclusions.length > 0 && (
