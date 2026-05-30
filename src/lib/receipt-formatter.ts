@@ -238,6 +238,24 @@ function cleanExclusionLabel(label: string) {
   return `No ${cleaned}`;
 }
 
+function parseCustomerAddress(notes?: string | null) {
+  const lines = (notes || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const addressLine = lines.find((line) => /^(adres|address)\s*:/i.test(line));
+  const postalCityLine = lines.find((line) => /^(postcode\/plaats|postal code\/city)\s*:/i.test(line));
+  const address = addressLine?.replace(/^(adres|address)\s*:\s*/i, "").trim() || "";
+  const postalCity = postalCityLine?.replace(/^(postcode\/plaats|postal code\/city)\s*:\s*/i, "").trim() || "";
+  const postalCityMatch = postalCity.match(/^(\d{4}\s?[A-Z]{2})\s+(.+)$/i);
+
+  return {
+    address,
+    postalCode: postalCityMatch?.[1]?.toUpperCase() || "",
+    city: postalCityMatch?.[2] || postalCity,
+  };
+}
+
 export function buildReceiptFromOrder(
   order: {
     id: string;
@@ -271,6 +289,7 @@ export function buildReceiptFromOrder(
     timeZone: "Europe/Amsterdam",
   });
   const parsedAddress = parseLocationAddress(location.address, location.name);
+  const customerAddress = parseCustomerAddress(order.notes);
 
   const items: ReceiptItem[] = order.items.map((item) => {
     const modifiers: { label: string; value: string }[] = [];
@@ -294,6 +313,9 @@ export function buildReceiptFromOrder(
     postalCode: parsedAddress.postalCode,
     city: parsedAddress.city,
     customerName: order.customerName,
+    customerAddress: customerAddress.address || undefined,
+    customerPostalCode: customerAddress.postalCode || undefined,
+    customerCity: customerAddress.city || undefined,
     customerPhone: order.customerPhone,
     orderNumber: order.orderNumber || order.id.slice(-8).toUpperCase(),
     orderDate,
