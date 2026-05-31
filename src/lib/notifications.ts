@@ -458,7 +458,8 @@ export async function sendReservationEmail(args: {
   const editUrl = reservationId
     ? `${baseUrl}/nl/reserve?edit=${encodeURIComponent(reservationId)}&token=${encodeURIComponent(createReservationEditToken(reservationId))}`
     : `${baseUrl}/nl/reserve`;
-  const cancelUrl = `mailto:${shownEmail}?subject=${encodeURIComponent(`Reservering annuleren - ${code}`)}`;
+  const cancelEmail = locationCopyEmail(locationSlug, location) || shownEmail;
+  const cancelUrl = `mailto:${cancelEmail}?subject=${encodeURIComponent(`Reservering annuleren - ${code}`)}`;
   const routeUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${location} ${address}`)}`;
   const body = `Hi ${customerName},
 
